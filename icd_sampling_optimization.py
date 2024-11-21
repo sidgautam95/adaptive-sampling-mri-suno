@@ -1,159 +1,176 @@
+# Function to optimized 1D Cartesian undersampling pattern for multicoil MRI
+
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 from utils import *
-from modl_utils import *
+import time
 
-def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,model,num_icd_iter,scan,slc_idx,recon='unet',device=torch.device('cpu'),\
-    nChannels=2,print_loss=False):
+
+def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_lines, model,device, num_icd_passes=1, nChannels=2, \
+                             recon='unet',print_loss=False,alpha1=1,alpha2=0,alpha3=0,alpha4=0,save_recon=False,num_modl_iter=6):
     
     '''
     Inputs:
-        ksp: multicoil kspace of size - no. of coils x height x width
-        mps: sensitivity maps of size - no. of coils x height x width
-        img_gt - Ground truth image of size - height x width
-        initial_mask - Initial Mask of size - height x width
-        model - Trained model on initial masks - UNet or MoDL
-        device - CPU/GPU
-        scan - name of scan (str)
-        slc_idx - slice index (int)
-        
+        ksp: multicoil kspace, shape: no. of coils x height x width
+        mps: sensitivity maps, shape: no. of coils x height x width
+        img_gt - Ground truth image, shape: height x width
+        initial_mask - Initial Mask (e.g. VDRS, LF, Equispaced, Greedy), shape: height x width
+        model - Trained model on images undersampled by initial mask - UNet or MoDL
+        num_icd_passes - No. of ICD passes
+        scan (str) - name of scan
+        slc_idx (int) - slice index
+        recon (str) - Reconstructor to be used: UNet/MoDL, default: unet
+        device - CPU/GPU, default: CPU
+        nChannels - No. of Channels (1 for real, 2 for complex), default: 2
+
+    Outputs
     '''
-    
+
     model.to(device)
-    nrmse_icd_list = []
+   
+    nCoils, height, width = ksp.shape
+
+    img_gt=crop_img(img_gt) # crop to central 320 x 320 region 
+    img_gt=img_gt/abs(img_gt).max() # Normalizing ground truth by maximum magniude
+
+    if nChannels==1:
+        img_gt = abs(img_gt)
+
+    icd_mask=torch.clone(initial_mask) # Initializing the ICD mask to be initial mask
+    us_factor=width//budget
+
+
+    # Getting ICD loss and reconstruction using the original ICD mask
+    if recon=='unet':
+        img_recon_initial = unet_recon_batched(ksp,mps,initial_mask,model, device=device)
+    elif recon=='modl':
+        img_recon_initial = modl_recon_batched(ksp,mps,initial_mask, model = model, device = device)
+    else:
+        print('Incorrect choice specified')
+        
+    img_recon_initial = torch.squeeze(img_recon_initial).to(device)
+
+    loss_initial = compute_loss(img_gt, img_recon_initial,alpha1,alpha2,alpha3,alpha4) # loss of initial mask
+
+    iter_count=0
+
     print('Running ICD algorithm')
+    print('Undersampling factor:',us_factor)
+    print('Budget:',budget)
+    print('Lines initialized at centre:',num_centre_lines)
+    print('No. of possible sampling locations available:',(budget-num_centre_lines))
+    print('Reconstructor Used:',recon)
 
-    # Normalizing ground truth
-    img_gt=img_gt/abs(img_gt).max()
+    loss_icd = torch.clone(loss_initial)
+    img_recon_icd = torch.clone(img_recon_initial)
 
-    nCoils, Height, Width = ksp.shape
+    loss_icd_list = []
+    loss_icd_list.append(loss_icd.cpu().detach().numpy())
 
-    icd_mask=np.copy(initial_mask) # Initializing the ICD mask to be initial mask
+    for iteration in range(num_icd_passes): # No. of ICD Iterations
 
-    us_factor = initial_mask.shape[-1]//sum(initial_mask[0]) # undersampling factor
+        print('ICD Iteration', iteration+1,'out of',num_icd_passes)
 
-    for iteration in range(num_icd_iter): # No. of ICD Iterations
+        # Find index of lines already added/present
+        added_lines_with_low_frequency = np.nonzero(icd_mask[0].cpu().detach().numpy())[0]
 
-        print('ICD Iteration', iteration+1,'out of',num_icd_iter)
+        low_frequency_indices = np.arange((width-num_centre_lines)//2,(width+num_centre_lines)//2)
 
-        added_lines = np.nonzero(icd_mask[0])[0]
+        # Enforcing the low frequency part to be True
+        icd_mask[:,low_frequency_indices] = True
 
-        for current_idx in added_lines: # Loop over every added line
+        # removing the low frequnecy lines from the indices of added lines
+        lines_to_be_moved = np.array(list(set(added_lines_with_low_frequency)-set(low_frequency_indices)))
 
-#             print('Moving line:', current_idx+1)
+        for current_idx in lines_to_be_moved: # Loop over added lines
 
-            candidate_lines = np.nonzero(np.logical_not(icd_mask[0]))[0] # Get indices where the line could move
+            # Get indices where the line could move
+            candidate_lines = np.nonzero(np.logical_not(icd_mask[0].cpu().detach().numpy()))[0] 
 
-            # Shape of candidate_masks: (Width-Budget) x Height x Width
-            # Creating array of candidate masks = (Width - budget) number of ICD masks
-            candidate_masks = np.expand_dims(icd_mask, 0).repeat(len(candidate_lines),0)
+            num_candidate_masks = len(candidate_lines)
 
+            # Shape of candidate_masks: (width-Budget) x height x width
+            # Creating array of candidate masks by expanding dimensions of ICD masks and repeating it over one dimension
+            candidate_masks = icd_mask.unsqueeze(0).repeat(num_candidate_masks,1,1)
+            
             # Removing the line from icd mask which is to be moved
             candidate_masks[:, :, current_idx] = False 
 
             # Assigning lines to candidate masks
-            for count, candidate_idx in enumerate(candidate_lines): 
-                candidate_masks[count, :, candidate_idx] = True # Setting the index to which the line is moved to be true
+            for count, candidate_lines in enumerate(candidate_lines):
+                candidate_masks[count,:,candidate_lines] = True
 
             if recon=='unet':
-                # Performing batched reconstruction on all candidate masks
-                img_recons = unet_recon_sense_batched(ksp,mps,candidate_masks,model, device=device,dataset=dataset) # UNET Reconstruction
-            else:
-                img_recons = modl_recon_batched(ksp,mps,candidate_masks,model, device, device=device,dataset=dataset) # MoDL Reconstruction
-            
-            if torch.is_tensor(img_recons):
-                img_recons = img_recons.cpu().detach().numpy()
-            
-            # plt.figure()
-            # plot_mr_image(img_recons[0])
-            # plt.savefig('icd_recon.png')
-            # print(compute_nrmse(img_gt,img_recons[0]))
+                img_recons = unet_recon_batched(ksp,mps,candidate_masks,model, device=device) # UNET Reconstruction
+            elif recon=='modl':
+                img_recons = modl_recon_batched(ksp,mps,candidate_masks, model, num_iter= num_modl_iter, device=device)
 
-            # breakpoint()
+            # Initializing the array for storing loss values for candidate masks
+            loss_candidate_masks = torch.zeros((num_candidate_masks)) 
 
-            # Initializing the array for storing nrmse values for candidate masks
-            # Length of this numpy array is equal to number of candidate masks generated
-            nrmse_candidate_masks = np.zeros((len(candidate_lines))) 
-
-            # Computing NRMSE for all candidate masks
-            for count in range(len(candidate_lines)): # Iterating over candidate masks
-                nrmse_candidate_masks[count] = compute_nrmse(img_gt,img_recons[count]) # Computing NRMSE
-
+            # Computing loss for all candidate masks
+            for count in range(num_candidate_masks): # Iterating over candidate masks
+                loss_candidate_masks[count] = compute_loss(img_gt,img_recons[count].to(device),alpha1,alpha2,alpha3,alpha4) # Computing loss
+             
             # End of loop for finding candidate masks
             ####################################################
 
-            # Getting ICD NRMSE and reconstruction using the original ICD mask
+            # Checking if any candidate mask has lesser loss than that of original ICD mask
+            if torch.min(loss_candidate_masks) < loss_icd:
 
-            if recon=='unet':
-            # Performing batched reconstruction on all candidate masks
-                img_recon_icd = unet_recon_sense_batched(ksp,mps,np.expand_dims(icd_mask, 0),model, device=device,dataset=dataset) # UNET Reconstruction
-            else:
-                img_recons = modl_recon_batched(ksp,mps,np.expand_dims(icd_mask, 0),model, device, device=device,dataset=dataset) # MoDL Reconstruction
-            
-            if torch.is_tensor(img_recons):
-                img_recons = img_recons.cpu().detach().numpy()
+                # Finding the index of candidate mask with lowest loss
+                min_loss_mask = torch.argmin(loss_candidate_masks)
 
-            
-            nrmse_icd = compute_nrmse(img_gt, img_recon_icd) 
+                # Making the candidate mask with minimum loss as the new ICD mask
+                icd_mask = torch.clone(candidate_masks[min_loss_mask])
 
-            # Checking if any candidate mask has lesser nrmse than that of original ICD mask
-            if np.min(nrmse_candidate_masks) < nrmse_icd: 
+                loss_icd = torch.clone(torch.min(loss_candidate_masks))
 
-                # Finding the index of candidate mask with lowest nrmse
-                min_nrmse_mask = np.argmin(nrmse_candidate_masks)
-
-                # Making the candidate mask with minimum nrmse as the new ICD mask
-                icd_mask = np.copy(candidate_masks[min_nrmse_mask])
-
-                # Getting ICD NRMSE and reconstruction using the original ICD mask
-                img_recon_icd = unet_recon_sense_batched(ksp,mps,np.expand_dims(icd_mask, 0),model, device=device,dataset=dataset)
-                nrmse_icd = compute_nrmse(img_gt, img_recon_icd)
-
-                if print_loss:
-                    print('Line', current_idx+1, 'moved to', str(min_nrmse_mask+1))
-
+                img_recon_icd = img_recons[min_loss_mask]
             else:
                 if print_loss:
                     print('Line not moved.')
-                
-            if print_loss:        
-                print('NRMSE ICD Mask:',nrmse_icd)
-            
-            nrmse_icd_list.append(nrmse_icd)
 
-            np.savez('icd_mask_'+str(us_factor)+'x_'+filename+'.npz',icd_mask=icd_mask[0],nrmse_icd_list=np.array(nrmse_icd_list))
+            loss_icd_list.append(loss_icd.cpu().detach().numpy())
 
-            # Saving Intermediate ICD icd_mask plot
+            np.savez('icd-results/icd_mask_'+str(us_factor)+'x.npz',\
+            icd_mask_1d=icd_mask[0].cpu().detach().numpy(),loss_icd_list=np.array(loss_icd_list),\
+            initial_mask=initial_mask[0].cpu().detach().numpy())
+
+            if save_recon:
+                np.save('icd-results/img_recon_icd_'+str(us_factor)+'x',img_recon_icd.cpu().detach().numpy())
+
+            # Save ground truth and reconstructed image
             plt.figure()
-            plt.imshow(icd_mask,cmap='gray')
-            plt.title('ICD Mask\nNRMSE='+str(round(nrmse_icd,2))+'\n'+filename)
-            plt.axis('off')
+            plt.subplot(2,3,1)
+            plot_mr_image(img_gt,title='Ground Truth')
+            plt.subplot(2,3,2)
+            plot_mr_image(img_recon_initial,title='Initial Recon\nLoss='+str(round(np.array(loss_icd_list)[0],3)))
+            plt.subplot(2,3,3)
+            plot_mr_image(img_recon_icd,title='ICD Recon\nLoss='+str(round(np.array(loss_icd_list)[-1],3)))
+            plt.subplot(2,3,5)
+            plot_mr_image(abs(img_gt.cpu()-img_recon_initial.cpu()),Vmax=0.2,normalize=False)                
+            plt.subplot(2,3,6)
+            plot_mr_image(abs(img_gt.cpu()-img_recon_icd.cpu()),Vmax=0.2,normalize=False)
             plt.tight_layout()
-            plt.savefig('icd_mask_'+str(us_factor)+'x_'+filename+'.png')
+            plt.savefig('icd-results/recon_'+str(us_factor)+'x.png')
 
-            # Saving Intermediate nrmse_candidate_masksor vs Iteration plot            
-            plt.figure()
-            plt.plot(np.array(nrmse_icd_list))
+            # Saving initial and the optimized ICD Mask
+            plt.figure(figsize=(15,5))
+            plt.subplot(1,3,1)
+            plt.imshow(initial_mask.cpu().detach().numpy(),cmap='gray')
+            plt.title('Initial Mask\nloss='+str(round(np.array(loss_icd_list)[0],3)))
+            plt.axis('off')
+            plt.subplot(1,3,2)
+            plt.imshow(icd_mask.cpu().detach().numpy(),cmap='gray')
+            plt.title('ICD Mask\nloss='+str(round(np.array(loss_icd_list)[-1],3)))
+            plt.axis('off')
+            plt.subplot(1,3,3)
+            plt.plot(np.arange(len(loss_icd_list))+1,np.array(loss_icd_list))
             plt.grid('on')
             plt.xlabel('No. of iterations')
-            plt.ylabel('NRMSE')
-            plt.title(filename)
-            plt.savefig('nrmse_icd_'+str(us_factor)+'x_'+filename+'.png')
+            plt.ylabel('Loss')
+            plt.savefig('icd-results/icd_mask_'+str(us_factor)+'x.png')
 
-            plt.figure()
-            plot_mr_image(img_recon_icd,title='Reconstruction using ICD Mask\nNRMSE='+str(round(nrmse_icd,2))+'\n'+filename)
-            plt.savefig('img_recon_'+str(us_factor)+'x_'+filename+'.png')
-
-            if len(nrmse_icd_list)>3:
-                #check whether the last element is greater than the second last element
-                if nrmse_icd_list[-1]>nrmse_icd_list[-2]:
-                    print('Loss going up for next iteration. Breaking out of loop')
-                    break
-
-        #check whether the last element is greater than the second last element
-        if nrmse_icd_list[-1]>nrmse_icd_list[-2]:
-            print('Loss going up for next iteration. Breaking out of loop')
-            break
-            
-
-    return icd_mask, np.array(nrmse_icd_list)
+    return icd_mask, np.array(loss_icd_list) # returns ICD mask and loss over iterations
