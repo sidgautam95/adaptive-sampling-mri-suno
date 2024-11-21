@@ -6,11 +6,11 @@ Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravi
 "Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)."
 arxiv link: 
 
-The data and saved models for running the code can be found at https://drive.google.com/drive/folders/1Ppog0VikG06vLUk6F63gn79pdAeAYL-F.
+The saved models for running the code can be found at https://drive.google.com/drive/folders/1Ppog0VikG06vLUk6F63gn79pdAeAYL-F.
 
 The MoDL data preprocessing component is inspired by https://github.com/JeffFessler/BLIPSrecon.
 
-Dataset Used: fastMRI https://arxiv.org/abs/1811.08839.
+We used the fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) which can be downloaded at https://fastmri.med.nyu.edu/. 
 
 The code is made up of three components: 
 * ICD sampling algorithm
