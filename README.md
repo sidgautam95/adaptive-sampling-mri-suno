@@ -25,6 +25,8 @@ Run `get_icd_mask.py` to get ICD mask for a given choice of reconstructor, metri
 3. Undersampling factor: 4x
 4. Initial Mask: Variable Density Random Sampling (VDRS)
 
+Command: `get_icd_mask.py unet nrmse 4 vdrs`
+
 
 ## Nearest Neighbor Search
 At inference time, a nearest neighbor search based on proximity to low-frequency k-space reconstructions is used to choose the best scan-specific mask from the training set.
