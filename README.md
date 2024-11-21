@@ -1,4 +1,5 @@
-# mri-sampling
+# Scan-adaptive Sampling for MRI (SUNO)
+
 
 Code for reproducing results for the paper:
 Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar (2024)
