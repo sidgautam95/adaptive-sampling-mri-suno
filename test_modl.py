@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import sys
-sys.path.insert(1, '/egr/research-slim/gautamsi/mri-sampling')
 from torch.nn import init
 from didn import DIDN
 import matplotlib.pyplot as plt
