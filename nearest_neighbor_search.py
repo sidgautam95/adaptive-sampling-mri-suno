@@ -1,4 +1,4 @@
-# # Nearest Neighbor Search based icd mask prediction for fastMRI multicoil dataset
+# # Nearest Neighbor Search based ICD mask prediction for fastMRI multicoil dataset
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -6,7 +6,6 @@ import torch.nn as nn
 import random
 from skimage.metrics import structural_similarity as ssim
 import sys
-sys.path.insert(1, '/egr/research-slim/gautamsi/mri-sampling')
 from utils import *
 from unet_fbr import Unet
 from modl_utils import *
