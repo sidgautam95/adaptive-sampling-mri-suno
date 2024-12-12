@@ -11,7 +11,7 @@ arxiv link:
 In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
 Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive sampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
 
-     `\underset{\bm{\theta},  \mathbf{M}_i \in \mathcal{C},\,i\in\{1,\cdots,N\}   }{\min} \sum_{i=1}^N \| f_{\bm{\theta}} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i \|_2^2,
+     `min_{\theta,M_i} \sum_{i=1}^N \| f_{{\theta}} ({A}_i^H {M}_i {y}^{full}_i ) - {x}^{gt}_i \|_2^2,
 
      argmin_x ||Ax-b||_2^2 + ||x-Dw(x)||^2_2 
 
