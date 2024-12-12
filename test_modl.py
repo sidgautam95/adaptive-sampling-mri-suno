@@ -29,7 +29,7 @@ else:
 
 torch.cuda.empty_cache()
 nChannels=2
-modl_path = '/egr/research-slim/shared/fastmri-multicoil/saved-models-siddhant/saved-models-uncropped/modl_didn_fastmri_icd_4x.pt'
+modl_path = 'saved-models/modl_didn_fastmri_vdrs_4x.pt'
 model = DIDN(nChannels, nChannels, num_chans=64, pad_data=True, global_residual=True, n_res_blocks=2)
 model.load_state_dict(torch.load(modl_path,map_location=device)) # Load
 model.to(device)
@@ -44,6 +44,7 @@ print('lambda=',lamda)
 
 modl_data_path = '/egr/research-slim/shared/fastmri-multicoil/modl-training-data-uncropped/'
 
+# enter scan and slice index
 scan = ...
 slc_idx = ..
 
