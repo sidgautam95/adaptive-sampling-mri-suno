@@ -13,7 +13,7 @@ Using a training set consisting of fully sampled $k$-space and corresponding gro
 
 
 $$
-\underset{\theta, \mathbf{M}_i}{\min} \sum_{i=1}^N || f_{\theta} ({A}_i^H {M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i ||_2^2
+\underset{\theta, {M}_i}{\min} \sum_{i=1}^N || f_{\theta} ({A}_i^H {M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i ||_2^2
 $$
 
 where $\mathbf{M}_i \in \mathcal{C}$ is the ith training mask that inserts zeros at non-sampled locations, $\mathbf{y}^{full}_i$ and $\mathbf{x}^{gt}_i$ are the ith fully-sampled multi-coil training $k$-space and the corresponding ground truth image, respectively and $N$ is the number of training images. $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget. $A_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the ith training scan, and $f_{\bm{\theta}}$ is the reconstruction network trained on the set of sampling patterns $M_i$'s. 
