@@ -29,10 +29,6 @@ The code is made up of three components:
 
 ## ICD Sampling algorithm.
 
-The following code implements the ICD sampling optimization using a trained reconstruction network:
-
-
-
 Run `get_icd_mask.py` to get ICD mask for a given choice of reconstructor, metric, undersampling factor and initial mask. Default parameters are:
 1. Reconstructor: UNet
 2. Metric: NRMSE
