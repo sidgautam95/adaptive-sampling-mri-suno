@@ -19,7 +19,7 @@ $$
 where M is the ith training mask that inserts zeros at non-sampled locations, y_full and x_gt are the ith fully-sampled multi-coil training $k$-space and the corresponding ground truth image, respectively and $N$ is the number of training images. $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget. $A_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the ith training scan, and $f_{\theta}$ is the reconstruction network trained on the set of sampling patterns $M_i$'s. 
 
 #### Alternating training framework:
-![alt text]([https://github.com/hkaggarwal/modl/blob/master/MoDL_recursive.png](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png])
+![alt text][((https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png]](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png))
 
 **Datasets**: We used the publicly available fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) for our experiments, which can be downloaded at https://fastmri.med.nyu.edu/. 
 
