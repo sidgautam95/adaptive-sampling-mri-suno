@@ -11,12 +11,14 @@ arxiv link:
 In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
 Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive sampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
 
+$$
     \underset{\bm{\theta},  \mathbf{M}_i \in \mathcal{C},\,i\in\{1,\cdots,N\}   }{\min} \sum_{i=1}^N \| f_{\bm{\theta}} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i \|_2^2,
-    \label{eq:alternate_min}
+$$
 
+where $\mathbf{M}_i \in \mathcal{C}$ is the $i$th training mask that inserts zeros at non-sampled locations, $\mathbf{y}^{full}_i$ and $\mathbf{x}^{gt}_i$ are the $i$th fully-sampled multi-coil training $k$-space and the corresponding ground truth image, respectively 
+and $N$ is the number of training images. $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget. $\mathbf{A}_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the $i$th training scan, and $f_{\bm{\theta}}$ is the reconstruction network trained on the set of sampling patterns $M_i$'s. 
 
-
-**Datasets**: We used the publicly available fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) which can be downloaded at https://fastmri.med.nyu.edu/. 
+**Datasets**: We used the publicly available fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) for our experiments, which can be downloaded at https://fastmri.med.nyu.edu/. 
 
 **Saved Models**: The saved models for running the code can be found at https://drive.google.com/drive/folders/1Ppog0VikG06vLUk6F63gn79pdAeAYL-F.
 
