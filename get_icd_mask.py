@@ -1,3 +1,5 @@
+# Code for running ICD sampling optimization for a sample multicoil MRI scan/slice
+# User specifies the reconstruction method, metric used and the undersampling factor at which the mask is acquired.
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
