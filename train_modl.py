@@ -27,17 +27,16 @@ model = model.float().to(device)
 learning_rate = 1e-4 # learning rate
 
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-train_loss = []
-val_loss = []
 
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min') # lr scheduler
 
 nepochs = 100 # no. of epochs
 tol = 1e-5 # tolerance for cg algorithm
 lamda = 1e2 # lamda weighting in the MoDL equation
 num_iter = 6 # No. of MoDL unrolling
 
-modl_data_path = '/egr/research-slim/gautamsi/shared/fastmri-multicoil/modl-training-data-uncropped/'
+# path of directory containnig the MoDL training data: 1. aliased images, 2. ground truth, 3. sensitivity maps, 4. masks
+modl_data_path = '../modl-training-data-uncropped/'
 
 # path of the directory containing the training aliased images
 train_img_aliased_path = modl_data_path + 'modl-training-data-4x-icd/train-img-aliased'
@@ -48,7 +47,7 @@ val_img_aliased_path = modl_data_path + 'modl-training-data-4x-icd/val-img-alias
 val_img_aliased_filenames = os.listdir(val_img_aliased_path)
 
 ntrain = len(train_img_aliased_filenames) # no. of training images/slices
-nval = len(val_img_aliased_filenames) # no. of validation imagaes
+nval = len(val_img_aliased_filenames) # no. of validation images
 
 for epoch in range(nepochs): # iterate over epochs
 
