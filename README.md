@@ -12,7 +12,7 @@ In this paper, we propose a novel approach for jointly learning a set of scan-ad
 Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive sampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
 
 $$
-\sum_{i=1}^N \| f_{{\theta}} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i \|_2^2
+\sum_{i=1}^N || f_{{\theta}} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i ||_2^2
 $$
 
 
