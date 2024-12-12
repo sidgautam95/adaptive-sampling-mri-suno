@@ -19,8 +19,6 @@ device_id = 1
 os.environ['CUDA_VISIBLE_DEVICES'] = str(device_id)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-torch.cuda.empty_cache()
-
 model = DIDN(2, 2, num_chans=64, pad_data=True, global_residual=True, n_res_blocks=2)
 
 init_weights(model, init_type='normal', gain=0.02)
@@ -41,9 +39,11 @@ num_iter = 6 # No. of MoDL unrolling
 
 modl_data_path = '/egr/research-slim/gautamsi/shared/fastmri-multicoil/modl-training-data-uncropped/'
 
+# path of the directory containing the training aliased images
 train_img_aliased_path = modl_data_path + 'modl-training-data-4x-icd/train-img-aliased'
 train_img_aliased_filenames = os.listdir(train_img_aliased_path)
 
+# path of the directory containing the validation aliased images
 val_img_aliased_path = modl_data_path + 'modl-training-data-4x-icd/val-img-aliased'
 val_img_aliased_filenames = os.listdir(val_img_aliased_path)
 
