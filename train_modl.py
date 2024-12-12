@@ -1,3 +1,4 @@
+# Code for training MoDL on set of multi-coil MR images undersampled by scan/slice adaptive masks
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
