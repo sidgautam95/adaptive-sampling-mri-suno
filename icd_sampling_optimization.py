@@ -1,4 +1,4 @@
-# Function to optimized 1D Cartesian undersampling pattern for multicoil MRI
+# Code for running the ICD sampling optimization for multicoil MRI
 
 import numpy as np
 import matplotlib.pyplot as plt
