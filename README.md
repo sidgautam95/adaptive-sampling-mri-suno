@@ -13,7 +13,7 @@ Using a training set consisting of fully sampled $k$-space and corresponding gro
 
 
 $$
-\underset{\theta}{\min} \sum_{i=1}^N || f_{\theta} ({A}_i^H {M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i ||_2^2
+\underset{\theta,  \mathbf{M}_i \in \mathcal{C},\,i\in\{1,\cdots,N\}}{\min} \sum_{i=1}^N || f_{\theta} ({A}_i^H {M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i ||_2^2
 $$
 
 
