@@ -1,9 +1,9 @@
 # Scan-adaptive Sampling for MRI (SUNO)
 
+Python implementation/Code for reproducing results for the paper:
 
-Code for reproducing results for the paper:
-Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar (2024)
-"Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)."
+## Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar (2024)
+## "Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)."
 
 arxiv link: 
 
@@ -47,7 +47,8 @@ Run `get_icd_mask.py` to get ICD mask for a given choice of reconstructor, metri
 3. Undersampling factor: 4x
 4. Initial Mask: Variable Density Random Sampling (VDRS)
 
-ICD Output:
+### ICD Output:
+
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_recon_4x.png)
 
 
