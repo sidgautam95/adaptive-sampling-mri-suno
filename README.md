@@ -21,6 +21,9 @@ where M is the ith training mask that inserts zeros at non-sampled locations, y_
 #### Alternating training framework:
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png)
 
+#### Nearest Neighbor Search
+![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/mri_testing_pipeline_nn.png)
+
 **Datasets**: We used the publicly available fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) for our experiments, which can be downloaded at https://fastmri.med.nyu.edu/. 
 
 **Saved Models**: The saved models for running the code can be found at https://drive.google.com/drive/folders/1Ppog0VikG06vLUk6F63gn79pdAeAYL-F.
@@ -44,11 +47,18 @@ At inference time, a nearest neighbor search based on proximity to low-frequency
 Run `nearest_neighbor_search.py` to get the nearest neighbor predicted mask (also called the SUNO mask).
 
 ## Training and Testing MoDL
-Run `train_modl.py` to train MoDL network on a set of training image, undersampled by scan adaptive masks.
+Run `train_modl.py` to train the MoDL network (https://ieeexplore.ieee.org/document/8434321) on a set of training images, undersampled by scan adaptive masks.
 
-Run `test_modl.py` to test the trained MoDL on the SUNO predicted mask.
+Run `test_modl.py` to test the trained MoDL on the SUNO-predicted mask.
+
+`modl_cg_functions.py` contains the helper functions for running the conjugate gradient algorithm inside the MoDL framework.
 
 The MoDL data preprocessing component is inspired by https://github.com/JeffFessler/BLIPSrecon.
+
+### Results:
+[Comparing ICD with ](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/img_recons_modl_file1001668_slc20_4x_with_lf.png)
+
+
 
 **Contact**
 The code is provided to support reproducible research. If you have any questions with the code or have some trouble running any module of the framework, you can contact me at gautamsi@msu.edu.
