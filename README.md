@@ -77,6 +77,8 @@ The MoDL data preprocessing component is inspired by https://github.com/JeffFess
 ### Reconstructed Images at 4x:
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/img_recons_modl_file1001668_slc20_4x_with_lf.png)
 
+The SUNO masks outperform the baseline masks at 4x. Bottom row shows the region of interest.
+
 
 **Contact**
 The code is provided to support reproducible research. If you have any questions with the code or have some trouble running any module of the framework, you can contact me at gautamsi@msu.edu.
