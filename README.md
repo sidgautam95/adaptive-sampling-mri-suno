@@ -21,6 +21,9 @@ where M is the ith training mask that inserts zeros at non-sampled locations, y_
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png)
 
+#### Getting Scan-adaptive masks:
+![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/mri_train_pipeline.png)
+
 #### Nearest Neighbor Search:
 Given our collection of scan-adaptive ICD sampling patterns obtained from the training process, the task at the test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
 
