@@ -8,7 +8,7 @@ Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravi
 arxiv link: 
 
 
-#### What this code does:
+#### Alternating training framework:
 In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
 Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive sampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
 
@@ -19,10 +19,14 @@ $$
 
 where M is the ith training mask that inserts zeros at non-sampled locations, y_full and x_gt are the ith fully-sampled multi-coil training $k$-space and the corresponding ground truth image, respectively and $N$ is the number of training images. $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget. $A_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the ith training scan, and $f_{\theta}$ is the reconstruction network trained on the set of sampling patterns $M_i$'s. 
 
-#### Alternating training framework:
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png)
 
-#### Nearest Neighbor Search
+#### Nearest Neighbor Search:
+Given our collection of scan-adaptive ICD sampling patterns obtained from the training process, the task at the test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
+
+$$
+d_i =  d(\mathbf{A}^H_{{test}} \mathbf{y}^{{lf}}_{{test}}, {A}^H_{{train_i}} {y}^{{lf}}_{{train_i}}),
+$$
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/mri_testing_pipeline_nn.png)
 
 **Datasets**: We used the publicly available fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) for our experiments, which can be downloaded at https://fastmri.med.nyu.edu/. 
