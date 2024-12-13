@@ -3,7 +3,7 @@
 
 Python implementation/Code for reproducing results for the paper:
 
-Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar (2024), "Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)."
+Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar. "Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)." arXiv preprint arXiv:yymm.xxxx (2025).
 
 arxiv link: 
 
