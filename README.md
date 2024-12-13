@@ -59,6 +59,7 @@ Run `test_modl.py` to test the trained MoDL on the SUNO-predicted mask.
 The MoDL data preprocessing component is inspired by https://github.com/JeffFessler/BLIPSrecon.
 
 ### Results:
+![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_vs_baseline_masks_fastmri_4x.png)
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/img_recons_modl_file1001668_slc20_4x_with_lf.png)
 
 
