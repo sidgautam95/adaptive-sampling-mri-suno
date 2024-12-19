@@ -1,7 +1,7 @@
 # Scan-adaptive Sampling for MRI (SUNO)
 ## Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)
 
-Python implementation/Code for reproducing results for the paper:
+Python implementation for the paper:
 
 Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar. "Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)." arXiv preprint arXiv:yymm.xxxx (2025).
 
@@ -70,15 +70,15 @@ Run `test_modl.py` to test the trained MoDL on the SUNO-predicted mask.
 The MoDL data preprocessing component is inspired by https://github.com/JeffFessler/BLIPSrecon.
 
 ### Results:
-### SUNO Mask with baseline masks at 4x:
+### SUNO mask with other baselines at 4x acceleration factor:
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_vs_baseline_masks_fastmri_4x.png)
 
 
 ### Reconstructed Images at 4x:
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/img_recons_modl_file1001668_slc20_4x_with_lf.png)
 
-The SUNO masks outperform the baseline masks at 4x. Bottom row shows the region of interest.
+The SUNO masks outperform the baseline masks at 4x. The bottom row shows the region of interest.
 
 
 **Contact**
-The code is provided to support reproducible research. If you have any questions with the code or have some trouble running any module of the framework, you can contact me at gautamsi@msu.edu.
+The code is provided to support reproducible research. If you have any questions about the code or have some trouble running any module of the framework, you can contact me at gautamsi@msu.edu.
