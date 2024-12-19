@@ -8,7 +8,7 @@ Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravi
 arxiv link: 
 
 
-#### Alternating training framework:
+### Alternating training framework:
 In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
 Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive sampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
 
@@ -21,10 +21,10 @@ where M is the ith training mask that inserts zeros at non-sampled locations, y_
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png)
 
-#### Getting Scan-adaptive masks:
+### Getting Scan-adaptive masks:
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/mri_train_pipeline.png)
 
-#### Nearest Neighbor Search:
+### Nearest Neighbor Search:
 Given our collection of scan-adaptive ICD sampling patterns obtained from the training process, the task at the test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
 
 $$
@@ -43,9 +43,9 @@ The code is made up of three components:
 * Nearest Neighbor Search
 * Training and Testing MoDL
 
-## ICD Sampling algorithm.
+## ICD-based Sampling Optimization algorithm
 
-Run `get_icd_mask.py` to get ICD mask for a given choice of reconstructor, metric, undersampling factor and initial mask. Default parameters are:
+Run `get_icd_mask.py` to get the ICD mask for a given choice of reconstructor, metric, undersampling factor, and initial mask. The default parameters are:
 1. Reconstructor: UNet
 2. Metric: NRMSE
 3. Undersampling factor: 4x
@@ -69,7 +69,7 @@ Run `test_modl.py` to test the trained MoDL on the SUNO-predicted mask.
 
 The MoDL data preprocessing component is inspired by https://github.com/JeffFessler/BLIPSrecon.
 
-### Results:
+## Results
 ### SUNO mask with other baselines at 4x acceleration factor:
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_vs_baseline_masks_fastmri_4x.png)
 
