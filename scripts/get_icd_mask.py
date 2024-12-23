@@ -4,6 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import time
+import sys
+sys.path.append("../utils") 
+sys.path.append("../models")
 from unet_fbr import Unet
 from utils import *
 from didn import DIDN
@@ -26,19 +29,19 @@ us_factor=4 # Undersampling factor
 # Load models
 if recon=='unet':
     model = Unet(in_chans=nChannels, out_chans=nChannels, chans=64)
-    model_path = '../saved-models/unet_fastmri_vdrs_4x.pt'
+    model_path = '../../saved-models/unet_fastmri_vdrs_4x.pt'
 elif recon=='modl':
     model = DIDN(nChannels, nChannels, num_chans=64, pad_data=True, global_residual=True, n_res_blocks=2)
-    model_path = '../saved-models/modl_didn_fastmri_vdrs_4x.pt'
+    model_path = '../../saved-models/modl_didn_fastmri_vdrs_4x.pt'
 
 
 model.load_state_dict(torch.load(model_path,map_location=device)); # Load
 model.eval()
 model.to(device)
 
-ksp = np.load('../data/ksp.npy')
-mps = np.load('../data/mps.npy')
-img_gt = np.load('../data/img_gt.npy')
+ksp = np.load('../../data/ksp.npy')
+mps = np.load('../../data/mps.npy')
+img_gt = np.load('../../data/img_gt.npy')
 
 img_gt = crop_img(img_gt) # crop ground truth
 img_gt = img_gt/abs(img_gt).max() # normalize ground truth
@@ -48,7 +51,7 @@ Width = ksp.shape[2]
 budget=Width//us_factor
 num_centre_lines = budget//3
 
-initial_mask = np.load('masks/vdrs_mask_4x.npy')
+initial_mask = np.load('../data/vdrs_mask_4x.npy')
 
 ksp = torch.tensor(ksp).to(device)
 mps = torch.tensor(mps).to(device)

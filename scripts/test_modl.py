@@ -1,62 +1,44 @@
-# Testing using trained MoDL
+# Code for testing/inference using pre-trained MoDL weights on the SUNO predicted mask for multicoil MRI
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 import sys
-from torch.nn import init
+sys.path.append("../utils") 
+sys.path.append("../models")
+from modl_cg_functions import *
+import modl_cg_functions
 from didn import DIDN
 import matplotlib.pyplot as plt
 from unet_fbr import Unet
 from utils import *
-from modl_utils import *
-import shutil
+import os
 
 torch.cuda.empty_cache()
     
-gpu_no = 3
-
-import os
-os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_no)
-
-use_gpu=True
-
-if use_gpu:
-    device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
-
+device_id = 1
+os.environ['CUDA_VISIBLE_DEVICES'] = str(device_id)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 torch.cuda.empty_cache()
 nChannels=2
-modl_path = 'saved-models/modl_didn_fastmri_vdrs_4x.pt'
+modl_path = '../../saved-models/modl_didn_fastmri_vdrs_4x.pt'
 model = DIDN(nChannels, nChannels, num_chans=64, pad_data=True, global_residual=True, n_res_blocks=2)
 model.load_state_dict(torch.load(modl_path,map_location=device)) # Load
 model.to(device)
 model.eval();
 print('MoDL loaded from',modl_path)
 
-tol = 0.00001
-lamda = 1e2
-num_iter = 6
+# Choose fully sampled kspace and the corresponding coil sensitivity maps of test k-space
+ksp = np.load('../../data/ksp.npy')
+mps = np.load('../../data/mps.npy')
+mask = np.load('suno_mask.npy') # choosing SUNO mask
 
-print('lambda=',lamda)
+ksp = torch.tensor(ksp).to(device)
+mps = torch.tensor(mps).to(device)
+mask = torch.tensor(mask).to(device)
 
-modl_data_path = '/egr/research-slim/shared/fastmri-multicoil/modl-training-data-uncropped/'
+# Performing MoDL reconstruction
+img_recon_modl = modl_recon(ksp,mps,mask, model, device=device)
 
-# enter scan and slice index
-scan = ...
-slc_idx = ..
-
-img_gt = np.load(modl_data_path + 'test-img-gt/test_img_gt_'+scan+'_slc'+str(slc_idx)+'.npy')
-smap = np.load(modl_data_path + 'test-maps/test_maps_'+scan+'_slc'+str(slc_idx)+'.npy')
-img_aliased = np.load(modl_data_path + 'modl-training-data-4x-nn-global/test-img-aliased/test_img_aliased_'+scan+'_slc'+str(slc_idx)+'.npy')
-mask = np.load(modl_data_path + 'modl-training-data-4x-nn-global/test-masks/test_masks_'+scan+'_slc'+str(slc_idx)+'.npy')
-
-mask = crop_pad_mask(mask,img_gt.shape[1],img_gt.shape[2])
-
-start=time.time()
-
-final_output = modl_recon_training(img_aliased, mask, smap, model, device=device)
-
-np.save('test_img_recon',torch.squeeze(final_output).cpu().detach().numpy())
+# Saving reconstructed image
+np.save('test_img_recon',torch.squeeze(img_recon_modl).cpu().detach().numpy())

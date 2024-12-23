@@ -1,10 +1,11 @@
 # Code for running the ICD sampling optimization for multicoil MRI
-
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+# import sys
+# sys.path.append("../utils") 
+# sys.path.append("../models")
 from utils import *
-import time
 
 
 def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_lines, model,device, num_icd_passes=1, nChannels=2, \
@@ -134,12 +135,12 @@ def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_line
 
             loss_icd_list.append(loss_icd.cpu().detach().numpy())
 
-            np.savez('icd-results/icd_mask_'+str(us_factor)+'x.npz',\
+            np.savez('icd_mask_'+str(us_factor)+'x.npz',\
             icd_mask_1d=icd_mask[0].cpu().detach().numpy(),loss_icd_list=np.array(loss_icd_list),\
             initial_mask=initial_mask[0].cpu().detach().numpy())
 
             if save_recon:
-                np.save('icd-results/img_recon_icd_'+str(us_factor)+'x',img_recon_icd.cpu().detach().numpy())
+                np.save('img_recon_icd_'+str(us_factor)+'x',img_recon_icd.cpu().detach().numpy())
 
             # Save ground truth and reconstructed image
             plt.figure()
@@ -154,7 +155,7 @@ def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_line
             plt.subplot(2,3,6)
             plot_mr_image(abs(img_gt.cpu()-img_recon_icd.cpu()),Vmax=0.2,normalize=False)
             plt.tight_layout()
-            plt.savefig('icd-results/recon_'+str(us_factor)+'x.png')
+            plt.savefig('recon_'+str(us_factor)+'x.png')
 
             # Saving initial and the optimized ICD Mask
             plt.figure(figsize=(15,5))
@@ -171,6 +172,6 @@ def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_line
             plt.grid('on')
             plt.xlabel('No. of iterations')
             plt.ylabel('Loss')
-            plt.savefig('icd-results/icd_mask_'+str(us_factor)+'x.png')
+            plt.savefig('icd_mask_'+str(us_factor)+'x.png')
 
     return icd_mask, np.array(loss_icd_list) # returns ICD mask and loss over iterations
