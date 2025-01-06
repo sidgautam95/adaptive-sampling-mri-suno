@@ -101,7 +101,7 @@ def greedy_sampling_optimization(ksp, mps, img_gt, initial_mask, budget, model, 
             print('Iteration:',greedy_iter,'| Lines added:',sum(greedy_mask[0]),'| Lines to be added: ',budget-sum(greedy_mask[0]),\
                   '| Loss:',round(np.min(loss_candidate_masks),4))
 
-        np.savez('greedy_mask_'+str(us_factor)+'x_.npz',greedy_mask_1d=greedy_mask[0],loss_greedy_list=np.array(loss_greedy_list),initial_mask=initial_mask[0])
+        np.savez('greedy_mask_'+str(us_factor)+'x.npz',greedy_mask_1d=greedy_mask[0],loss_greedy_list=np.array(loss_greedy_list),initial_mask=initial_mask[0])
         
         # Save ground truth and reconstructed image
         plt.figure()

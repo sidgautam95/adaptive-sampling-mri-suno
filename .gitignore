@@ -14,7 +14,6 @@ bin-release/
 *.apk
 *.pt 
 *.npz
-*.png
 *.npy
 *.mat
 */__pycache__/*
