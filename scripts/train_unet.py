@@ -1,4 +1,4 @@
-# Code for training MoDL on set of multi-coil MR images undersampled by scan/slice adaptive masks
+# Code for training U-Net on set of multi-coil MR images undersampled by scan/slice adaptive masks
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,9 +6,6 @@ import numpy as np
 import sys
 sys.path.append("../utils") 
 sys.path.append("../models")
-from modl_cg_functions import *
-import modl_cg_functions
-from didn import DIDN
 import matplotlib.pyplot as plt
 from unet_fbr import Unet
 from utils import *
@@ -20,21 +17,19 @@ device_id = 1
 os.environ['CUDA_VISIBLE_DEVICES'] = str(device_id)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-model = DIDN(2, 2, num_chans=64, pad_data=True, global_residual=True, n_res_blocks=2)
+model = Unet(in_chans = 2, out_chans = 2, num_pool_layers=4,chans=64).to(device)
 model = model.float().to(device)
-
+model.to(device)
+model.train();
 
 learning_rate = 1e-4 # learning rate
 nepochs = 100 # no. of epochs
-tol = 1e-5 # tolerance for CG algorithm
-lamda = 1e2 # weighting factor
-num_iter = 6 # No. of unrolling of denoiser and CG block
 
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) # Optimizer
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min') # lr scheduler
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min') # LR Scheduler
 
 # path of directory containing the training data:
-# Needed data: 1. aliased images, 2. ground truth, 3. sensitivity maps, 4. masks
+# Needed data: 1. aliased images, 2. ground truth
 training_data_path = '/egr/research-slim/shared/fastmri-multicoil/modl-training-data-uncropped/'
 
 # Each training and validation (.npy) file contains only one slice of a particular scan
@@ -59,22 +54,26 @@ for epoch in range(nepochs): # iterate over epochs
         scan = train_filenames[idx][18:29]
         slc_idx = train_filenames[idx][33:-4]
 
-        # Load the training (two-channel) ground truth, aliased image (A^H My), and the undersampling mask, sensitivity maps
+        # Load the training (two-channel) ground truth and the aliased image (A^H My)
         img_gt = np.load(training_data_path + 'train-img-gt/train_img_gt_'+scan+'_slc'+str(slc_idx)+'.npy')
         img_aliased = np.load(training_data_path + 'modl-training-data-4x-icd/train-img-aliased/train_img_aliased_'+scan+'_slc'+str(slc_idx)+'.npy')
-        mask = np.load(training_data_path + 'modl-training-data-4x-icd/train-masks/train_masks_'+scan+'_slc'+str(slc_idx)+'.npy')
-        mps = np.load(training_data_path + 'train-maps/train_maps_'+scan+'_slc'+str(slc_idx)+'.npy')
-
-        img_recon_modl = modl_recon_training(img_aliased, mask, mps, model, device=device) # Performing MoDL reconstruction
 
         target = torch.tensor(img_gt).to(device).float().unsqueeze(0)
+        input = torch.tensor(img_aliased).to(device).float().unsqueeze(0)
+
+        # Normalizing the input and target by their maximum absolute magnitude
+        target = target/abs(target).max()
+        input = input/abs(input).max()
+
+        img_recon_unet = model(input) # Applying U-Net model
 
         optimizer.zero_grad() # Zero out the gradient
-        loss = loss_fn(target, img_recon_modl) # computing loss (NRMSE)
+        loss = loss_fn(target, img_recon_unet) # computing loss (NRMSE)
         loss.backward() # Computing gradient
         optimizer.step() # Perform the optimization step to update parameters
 
         train_loss_total += float(loss) # computing total loss over all training samples
+
 
     with torch.no_grad(): # gradient computation not required
 
@@ -84,17 +83,20 @@ for epoch in range(nepochs): # iterate over epochs
             scan = val_filenames[idx][16:27]
             slc_idx = val_filenames[idx][31:-4]
 
-            # Load the validation (two-channel) ground truth, aliased image (A^H My), and the undersampling mask, sensitivity maps
+            # Load the validation (two-channel) ground truth and the aliased image (A^H My)
             img_gt = np.load(training_data_path + 'val-img-gt/val_img_gt_'+scan+'_slc'+str(slc_idx)+'.npy')
-            mps = np.load(training_data_path + 'val-maps/val_maps_'+scan+'_slc'+str(slc_idx)+'.npy')
             img_aliased = np.load(training_data_path + 'modl-training-data-4x-icd/val-img-aliased/val_img_aliased_'+scan+'_slc'+str(slc_idx)+'.npy')
-            mask = np.load(training_data_path + 'modl-training-data-4x-icd/val-masks/val_masks_'+scan+'_slc'+str(slc_idx)+'.npy')
-
-            img_recon_modl = modl_recon_training(img_aliased, mask, mps, model, device=device)
 
             target = torch.tensor(img_gt).to(device).float().unsqueeze(0)
+            input = torch.tensor(img_aliased).to(device).float().unsqueeze(0)
 
-            loss = loss_fn(target, img_recon_modl)
+            # Normalizing the input and target by their maximum absolute magnitude
+            target = target/abs(target).max()
+            input = input/abs(input).max()
+
+            img_recon_unet = model(input) # Applying U-Net model
+
+            loss = loss_fn(target, img_recon_unet)
 
             val_loss_total += float(loss)
 
@@ -116,7 +118,7 @@ for epoch in range(nepochs): # iterate over epochs
     plt.grid('on');plt.xlabel('Epoch'); plt.ylabel('Loss');
     plt.legend(['Training','Valdation']);
     plt.title('Network Training: Loss vs Epoch')
-    plt.savefig('loss.png')
+    plt.savefig('unet_loss.png')
 
     # Saving the model parameters
-    torch.save(model.state_dict(),"model.pt")
+    torch.save(model.state_dict(),"unet_model.pt")

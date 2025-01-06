@@ -1,15 +1,139 @@
 # MoDL-CG Implementation from https://github.com/JeffFessler/BLIPSrecon/tree/main
-
 import torch
 import torch.nn as nn
+from torch import Tensor
 from torch.nn import init
 import matplotlib.pyplot as plt
 import functools
 import torch.nn.functional as F
 from torch.optim import lr_scheduler
 import numpy as np
-from utils import *
 import scipy.linalg
+
+
+def fft_new(image: Tensor, ndim: int, normalized: bool = False) -> Tensor:
+    norm = "ortho" if normalized else None
+    dims = tuple(range(-ndim, 0))
+
+    image = torch.view_as_real(
+        torch.fft.fftn(  # type: ignore
+            torch.view_as_complex(image.contiguous()), dim=dims, norm=norm
+        )
+    )
+
+    return image
+
+
+def ifft_new(image: Tensor, ndim: int, normalized: bool = False) -> Tensor:
+    norm = "ortho" if normalized else None
+    dims = tuple(range(-ndim, 0))
+    image = torch.view_as_real(
+        torch.fft.ifftn(  # type: ignore
+            torch.view_as_complex(image.contiguous()), dim=dims, norm=norm
+        )
+    )
+
+    return image
+
+def roll(x, shift, dim):
+    """
+    Similar to np.roll but applies to PyTorch Tensors
+    """
+    if isinstance(shift, (tuple, list)):
+        assert len(shift) == len(dim)
+        for s, d in zip(shift, dim):
+            x = roll(x, s, d)
+        return x
+    shift = shift % x.size(dim)
+    if shift == 0:
+        return x
+    left = x.narrow(dim, 0, x.size(dim) - shift)
+    right = x.narrow(dim, x.size(dim) - shift, shift)
+    return torch.cat((right, left), dim=dim)
+
+def fftshift(x, dim=None):
+    """
+    Similar to np.fft.fftshift but applies to PyTorch Tensors
+    """
+    if dim is None:
+        dim = tuple(range(x.dim()))
+        shift = [dim // 2 for dim in x.shape]
+    elif isinstance(dim, int):
+        shift = x.shape[dim] // 2
+    else:
+        shift = [x.shape[i] // 2 for i in dim]
+    return roll(x, shift, dim)
+
+def ifftshift(x, dim=None):
+    """
+    Similar to np.fft.ifftshift but applies to PyTorch Tensors
+    """
+    if dim is None:
+        dim = tuple(range(x.dim()))
+        shift = [(dim + 1) // 2 for dim in x.shape]
+    elif isinstance(dim, int):
+        shift = (x.shape[dim] + 1) // 2
+    else:
+        shift = [(x.shape[i] + 1) // 2 for i in dim]
+    return roll(x, shift, dim)
+
+
+
+def fft2(data):
+    """
+    Apply centered 2 dimensional Fast Fourier Transform.
+    Args:
+        data (torch.Tensor): Complex valued input data containing at least 3 dimensions: dimensions
+            -3 & -2 are spatial dimensions and dimension -1 has size 2. All other dimensions are
+            assumed to be batch dimensions.
+    Returns:
+        torch.Tensor: The FFT of the input.
+    """
+    assert data.size(-1) == 2
+    data = ifftshift(data, dim=(-3, -2))
+    data = fft_new(data, 2, normalized=True)
+    data = fftshift(data, dim=(-3, -2))
+    return data
+
+
+def ifft2(data):
+    """
+    Apply centered 2-dimensional Inverse Fast Fourier Transform.
+    Args:
+        data (torch.Tensor): Complex valued input data containing at least 3 dimensions: dimensions
+            -3 & -2 are spatial dimensions and dimension -1 has size 2. All other dimensions are
+            assumed to be batch dimensions.
+    Returns:
+        torch.Tensor: The IFFT of the input.
+    """
+    assert data.size(-1) == 2
+    data = ifftshift(data, dim=(-3, -2))
+    data = ifft_new(data, 2, normalized=True)
+    data = fftshift(data, dim=(-3, -2))
+    return data
+
+
+def complex_matmul(a, b):
+    # function to multiply two complex variable in pytorch, the real/imag channel are in the third last two channels ((batch), (coil), 2, height, width).
+    if len(a.size()) == 3:
+        return torch.cat(((a[0, ...] * b[0, ...] - a[1, ...] * b[1, ...]).unsqueeze(0),
+                          (a[0, ...] * b[1, ...] + a[1, ...] * b[0, ...]).unsqueeze(0)), dim=0)
+    if len(a.size()) == 4:
+        return torch.cat(((a[:, 0, ...] * b[:, 0, ...] - a[:, 1, ...] * b[:, 1, ...]).unsqueeze(1),
+                          (a[:, 0, ...] * b[:, 1, ...] + a[:, 1, ...] * b[:, 0, ...]).unsqueeze(1)), dim=1)
+    if len(a.size()) == 5:
+        return torch.cat(((a[:, :, 0, ...] * b[:, :, 0, ...] - a[:, :, 1, ...] * b[:, :, 1, ...]).unsqueeze(2),
+                          (a[:, :, 0, ...] * b[:, :, 1, ...] + a[:, :, 1, ...] * b[:, :, 0, ...]).unsqueeze(2)), dim=2)
+
+
+def complex_conj(a):
+    # function to multiply two complex variable in pytorch, the real/imag channel are in the last two channels.
+    if len(a.size()) == 3:
+        return torch.cat((a[0, ...].unsqueeze(0), -a[1, ...].unsqueeze(0)), dim=0)
+    if len(a.size()) == 4:
+        return torch.cat((a[:, 0, ...].unsqueeze(1), -a[:, 1, ...].unsqueeze(1)), dim=1)
+    if len(a.size()) == 5:
+        return torch.cat((a[:, :, 0, ...].unsqueeze(2), -a[:, :, 1, ...].unsqueeze(2)), dim=2)
 
 def get_norm_layer(norm_type='instance'):
     if norm_type == 'batch_size':
@@ -216,3 +340,7 @@ def cg_block(smap, mask, b0, AHb, lamda, tol, M=None, zn=None):
         num_loop = num_loop + 1
     # print('Finished cg iteration after',num_loop+1,'iterations') 
     return xk
+
+
+def CG_fn(output, tol ,lamda, mps, mask, aliased_image, device):
+    return CG.apply(output, tol ,lamda, mps, mask, aliased_image,device)

@@ -8,24 +8,24 @@ import torch
 from utils import *
 
 
-def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_lines, model,device, num_icd_passes=1, nChannels=2, \
-                             recon='unet',print_loss=False,alpha1=1,alpha2=0,alpha3=0,alpha4=0,save_recon=False,num_modl_iter=6):
+def icd_sampling_optimization(ksp, mps, img_gt, initial_mask, budget, num_centre_lines, model, device, num_icd_passes=1, nChannels=2, \
+                             recon='unet', print_loss=False, alpha1=1, alpha2=0, alpha3=0, alpha4=0, save_recon=False, num_modl_iter=6):
     
     '''
     Inputs:
-        ksp: multicoil kspace, shape: no. of coils x height x width
-        mps: sensitivity maps, shape: no. of coils x height x width
+        ksp - multicoil kspace, shape: no. of coils x height x width
+        mps - sensitivity maps, shape: no. of coils x height x width
         img_gt - Ground truth image, shape: height x width
         initial_mask - Initial Mask (e.g. VDRS, LF, Equispaced, Greedy), shape: height x width
         model - Trained model on images undersampled by initial mask - UNet or MoDL
         num_icd_passes - No. of ICD passes
-        scan (str) - name of scan
-        slc_idx (int) - slice index
         recon (str) - Reconstructor to be used: UNet/MoDL, default: unet
         device - CPU/GPU, default: CPU
         nChannels - No. of Channels (1 for real, 2 for complex), default: 2
 
-    Outputs
+    Outputs:
+        icd_mask - Optimized Mask, shape: height x width
+        loss_icd_list - ICD loss for every icd_pass, shape: 1 x (width-budget)
     '''
 
     model.to(device)
@@ -54,7 +54,7 @@ def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_line
 
     loss_initial = compute_loss(img_gt, img_recon_initial,alpha1,alpha2,alpha3,alpha4) # loss of initial mask
 
-    iter_count=0
+    lines_moved=0
 
     print('Running ICD algorithm')
     print('Undersampling factor:',us_factor)
@@ -68,10 +68,11 @@ def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_line
 
     loss_icd_list = []
     loss_icd_list.append(loss_icd.cpu().detach().numpy())
+    icd_iter=0
 
-    for iteration in range(num_icd_passes): # No. of ICD Iterations
+    for icd_pass in range(num_icd_passes): # No. of ICD Iterations
 
-        print('ICD Iteration', iteration+1,'out of',num_icd_passes)
+        print('ICD Iteration', icd_pass+1,'out of',num_icd_passes)
 
         # Find index of lines already added/present
         added_lines_with_low_frequency = np.nonzero(icd_mask[0].cpu().detach().numpy())[0]
@@ -85,6 +86,8 @@ def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_line
         lines_to_be_moved = np.array(list(set(added_lines_with_low_frequency)-set(low_frequency_indices)))
 
         for current_idx in lines_to_be_moved: # Loop over added lines
+
+            icd_iter+=1
 
             # Get indices where the line could move
             candidate_lines = np.nonzero(np.logical_not(icd_mask[0].cpu().detach().numpy()))[0] 
@@ -119,7 +122,6 @@ def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_line
 
             # Checking if any candidate mask has lesser loss than that of original ICD mask
             if torch.min(loss_candidate_masks) < loss_icd:
-
                 # Finding the index of candidate mask with lowest loss
                 min_loss_mask = torch.argmin(loss_candidate_masks)
 
@@ -129,9 +131,14 @@ def icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_line
                 loss_icd = torch.clone(torch.min(loss_candidate_masks))
 
                 img_recon_icd = img_recons[min_loss_mask]
+
+                lines_moved+=1
+
+                if print_loss:
+                    print('Iteration:',icd_iter,'| Lines moved:',lines_moved,'| Loss:',round(loss_icd.item(), 4))
             else:
                 if print_loss:
-                    print('Line not moved.')
+                    print('Iteration:',icd_iter,'| Line not moved | Loss:',round(loss_icd.item(), 4))
 
             loss_icd_list.append(loss_icd.cpu().detach().numpy())
 

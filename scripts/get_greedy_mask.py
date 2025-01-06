@@ -1,4 +1,4 @@
-# Code for running ICD sampling optimization for a sample multicoil MRI scan/slice
+# Code for running greedy sampling optimization for a sample multicoil MRI scan/slice
 # User specifies the reconstruction method, metric used and the undersampling factor at which the mask is acquired.
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,7 +11,7 @@ from unet_fbr import Unet
 from utils import *
 from didn import DIDN
 import os
-from icd_sampling_optimization import icd_sampling_optimization
+from greedy_sampling_optimization import greedy_sampling_optimization
 
 torch.set_num_threads(4)
 
@@ -19,8 +19,7 @@ device_id = 1
 os.environ['CUDA_VISIBLE_DEVICES'] = str(device_id)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# Parameters of ICD algorithm
-num_icd_iter=1 # No of ICD passes
+# Parameters of greedy algorithm
 recon = 'unet'#'unet' # choose reconstruction method
 metric = 'nrmse' # choose metric
 nChannels=2 # No. of channels
@@ -52,13 +51,13 @@ Width = ksp.shape[2]
 budget=Width//us_factor
 num_centre_lines = budget//3
 
-initial_mask =  make_vdrs_mask(Height,Width,budget,num_centre_lines) 
+initial_mask = make_lf_mask(Height,Width,num_centre_lines) # Initializing with a low frequency mask
 
-ksp = torch.tensor(ksp).to(device)
-mps = torch.tensor(mps).to(device)
-img_gt = torch.tensor(img_gt).to(device)
-initial_mask = torch.tensor(initial_mask).to(device)
+# ksp = torch.tensor(ksp).to(device)
+# mps = torch.tensor(mps).to(device)
+# img_gt = torch.tensor(img_gt).to(device)
+# initial_mask = torch.tensor(initial_mask).to(device)
 
 
-icd_mask, loss_icd_list = icd_sampling_optimization(ksp,mps,img_gt,initial_mask,budget,num_centre_lines, model,device, num_icd_iter, nChannels, \
-                             recon,print_loss=True,alpha1=1,alpha2=0,alpha3=0,alpha4=0,save_recon=False,num_modl_iter=6)
+greedy_mask, loss_greedy_list = greedy_sampling_optimization(ksp, mps, img_gt, initial_mask, budget, model, device=device, nChannels=nChannels, \
+                             recon=recon, print_loss=True, alpha1=1, alpha2=0, alpha3=0, alpha4=0, save_recon=False, num_modl_iter=6)
