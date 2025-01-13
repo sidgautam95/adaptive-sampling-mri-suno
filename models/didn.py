@@ -4,7 +4,7 @@ Copyright (c) 2019 Imperial College London.
 This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 """
-
+# Paper: Songhyun Yu, et. al. "Deep iterative down-up cnn for image denoising." Proceedings of the IEEE/CVF conference on CVPR workshops. 2019.
 import torch
 import torch.nn as nn
 import numpy as np
