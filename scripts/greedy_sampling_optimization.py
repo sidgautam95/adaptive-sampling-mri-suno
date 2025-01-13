@@ -1,108 +1,93 @@
 # Code for implementing the greedy sampling optimization for multicoil MRI
-# Source: Gözcü, Baran, et al. "Learning-based compressive MRI." IEEE TMI 37.6 (2018): 1394-1406.
+# Paper: Gözcü, Baran, et al. "Learning-based compressive MRI." IEEE TMI 37.6 (2018): 1394-1406.
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import sys
-sys.path.append("../utils") 
-sys.path.append("../models")
 from utils import *
 
-
-def greedy_sampling_optimization(ksp, mps, img_gt, initial_mask, budget, model, device, nChannels=2, \
-                             recon='unet', print_loss=False, alpha1=1, alpha2=0, alpha3=0, alpha4=0, save_recon=False, num_modl_iter=6):
-    
-    '''
+def greedy_sampling_optimization(ksp, mps, img_gt, initial_mask, budget, model, device, nChannels=2, 
+                                 recon='unet', print_loss=False, alpha1=1, alpha2=0, alpha3=0, alpha4=0, 
+                                 save_recon=False, num_modl_iter=6):
+    """
     Inputs:
         ksp - multicoil kspace, shape: no. of coils x height x width
         mps - sensitivity maps, shape: no. of coils x height x width
         img_gt - Ground truth image, shape: height x width
-        initial_mask - Initial Mask (e.g. VDRS, LF, Equispaced, Greedy), shape: height x width
-        model - Trained model on images undersampled by initial mask - UNet or MoDL
-        recon (str) - Reconstructor to be used: UNet/MoDL, default: unet
+        initial_mask - Initial Mask (e.g., VDRS, LF, Equispaced, Greedy), shape: height x width
+        budget - Total number of lines to include in the mask
+        model - Trained model weights (e.g., UNet or MoDL)
         device - CPU/GPU, default: CPU
-        nChannels - No. of Channels (1 for real, 2 for complex), default: 2
-
+        recon - Reconstructor to be used: 'unet' or 'modl', default: 'unet'
+        nChannels - Number of channels (1 for real, 2 for complex), default: 2
     Outputs:
-        greedy_mask - Optimized Mask, shape: height x width
-        loss_greedy_list - Loss for every iteration, shape: 1 x (width-budget)
-    '''
+        greedy_mask - Optimized mask, shape: height x width
+        loss_greedy_list - Loss at each iteration, shape: 1 x (budget - num_centre_lines)
+    """
 
-    img_gt=img_gt/abs(img_gt).max() # Normalizing ground truth
-    img_gt=torch.tensor(img_gt).to(device)
-    
+    # Normalize ground truth
+    img_gt = img_gt / torch.abs(img_gt).max()
+    img_gt = img_gt.to(device)
+
     nCoils, Height, Width = ksp.shape
+    greedy_mask = initial_mask.clone()  # PyTorch tensor for the mask
+    num_lines_to_add = budget - torch.sum(greedy_mask[0]).item()
+    us_factor = Width // budget
 
-    lines=np.full(Width, False) # Lines to be included in greedy_mask
+    print(f"Greedy mask initialized with lines: {torch.sum(greedy_mask[0])}")
+    print(f"Lines to be added: {num_lines_to_add}")
 
-    greedy_mask = np.copy(initial_mask)
-      
-    num_lines_to_be_added=budget-sum(lines)
-
-    us_factor = Width//budget
-    
-    print('greedy_mask initiliased with lines:',sum(greedy_mask[0]))
-    print('Lines to be added:',num_lines_to_be_added)
-
-    if recon=='unet':
-        img_recon_initial = unet_recon_batched(ksp,mps,initial_mask,model, device=device)
-    elif recon=='modl':
-        img_recon_initial = modl_recon_batched(ksp,mps,initial_mask, model = model, device = device)
+    if recon == 'unet':
+        img_recon_initial = unet_recon_batched(ksp, mps, initial_mask, model, device=device)
+    elif recon == 'modl':
+        img_recon_initial = modl_recon_batched(ksp, mps, initial_mask, model=model, device=device)
     else:
-        print('Incorrect choice specified')
-        
-    img_recon_initial = torch.squeeze(img_recon_initial).to(device)
+        raise ValueError("Incorrect choice specified for recon")
 
-    loss_initial = compute_loss(img_gt, img_recon_initial,alpha1,alpha2,alpha3,alpha4) # loss of initial mask
-    
-    line_indices=[]; loss_greedy_list=[]; iter_time=[]
+    img_recon_initial = img_recon_initial.squeeze().to(device)
+    loss_initial = compute_loss(img_gt, img_recon_initial, alpha1, alpha2, alpha3, alpha4)
 
-    greedy_iter=0
+    loss_greedy_list = []
+    greedy_iter = 0
 
-    while sum(greedy_mask[0])<budget:  # Iterate until the desired number of lines have been added
+    while torch.sum(greedy_mask[0]).item() < budget:
+        greedy_iter += 1
 
-        greedy_iter+=1
-        candidate_lines = np.nonzero(np.logical_not(greedy_mask[0]))[0] # Get indices where the line could move
-
+        # Get indices of candidate lines to add
+        candidate_lines = torch.where(~greedy_mask[0])[0]
         num_candidate_masks = len(candidate_lines)
 
-        # Shape of candidate_masks: (Width-Budget) x Height x Width
-        # Creating array of candidate masks = num_lines_to_be_added number of greedy masks
-        candidate_masks = np.expand_dims(greedy_mask, 0).repeat(num_candidate_masks,0)
+        # Create candidate masks
+        candidate_masks = greedy_mask.unsqueeze(0).repeat(num_candidate_masks, 1, 1)
+        for i, line in enumerate(candidate_lines):
+            candidate_masks[i, :, line] = True
 
-        # Assigning lines to candidate masks
-        for count, candidate_lines in enumerate(candidate_lines):
-            candidate_masks[count,:,candidate_lines] = True
+        # Perform reconstruction with candidate masks
+        if recon == 'unet':
+            img_recons = unet_recon_batched(ksp, mps, candidate_masks, model, device=device)
+        elif recon == 'modl':
+            img_recons = modl_recon_batched(ksp, mps, candidate_masks, model=model, num_iter=num_modl_iter, device=device)
 
-        if recon=='unet':
-            img_recons = unet_recon_batched(ksp,mps,candidate_masks,model, device=device) # UNET Reconstruction
-        elif recon=='modl':
-            img_recons = modl_recon_batched(ksp,mps,candidate_masks, model, num_iter= num_modl_iter, device=device) # MODL Reconstruction
+        # Compute loss for each candidate mask
+        loss_candidate_masks = torch.zeros(num_candidate_masks, device=device)
+        for i in range(num_candidate_masks):
+            loss_candidate_masks[i] = compute_loss(img_gt, img_recons[i].to(device), alpha1, alpha2, alpha3, alpha4)
 
-        # Initializing the array for storing nrmse values for candidate masks
-        # Length of this numpy array is equal to number of candidate masks generated
-        loss_candidate_masks = np.zeros((num_candidate_masks)) 
+        # Find and apply the best candidate mask
+        min_loss_idx = torch.argmin(loss_candidate_masks)
+        greedy_mask = candidate_masks[min_loss_idx]
 
-        # Computing loss for all candidate masks
-        for count in range(num_candidate_masks): # Iterating over candidate masks
-            loss_candidate_masks[count] = compute_loss(img_gt,img_recons[count].to(device),alpha1,alpha2,alpha3,alpha4) # Computing loss
-             
-        # Finding the index of candidate mask with lowest nrmse
-        min_loss_mask = np.argmin(loss_candidate_masks)
+        img_recon_greedy = img_recons[min_loss_idx]
+        loss_greedy_list.append(loss_candidate_masks[min_loss_idx].item())
 
-        # Making the candidate mask with minimum nrmse as the new greedy mask
-        greedy_mask = np.copy(candidate_masks[min_loss_mask])
-
-        img_recon_greedy = img_recons[min_loss_mask]
-                
-        loss_greedy_list.append(np.min(loss_candidate_masks))
-      
         if print_loss:
-            print('Iteration:',greedy_iter,'| Lines added:',sum(greedy_mask[0]),'| Lines to be added: ',budget-sum(greedy_mask[0]),\
-                  '| Loss:',round(np.min(loss_candidate_masks),4))
+            print(f"Iteration: {greedy_iter} | Lines added: {torch.sum(greedy_mask[0]).item()} | "
+                  f"Lines to be added: {budget - torch.sum(greedy_mask[0]).item()} | Loss: {loss_candidate_masks[min_loss_idx].item():.4f}")
 
-        np.savez('greedy_mask_'+str(us_factor)+'x.npz',greedy_mask_1d=greedy_mask[0],loss_greedy_list=np.array(loss_greedy_list),initial_mask=initial_mask[0])
-        
+        # Save mask and reconstruction
+        np.savez('greedy_mask_'+str(us_factor)+'x.npz',greedy_mask_1d=greedy_mask[0].cpu().detach().numpy(),\
+        loss_greedy_list=np.array(loss_greedy_list),initial_mask=initial_mask[0].cpu().detach().numpy())
+    
         # Save ground truth and reconstructed image
         plt.figure()
         plt.subplot(2,3,1)
@@ -121,12 +106,12 @@ def greedy_sampling_optimization(ksp, mps, img_gt, initial_mask, budget, model, 
         # Saving initial and the optimized Greedy Mask
         plt.figure(figsize=(15,5))
         plt.subplot(1,3,1)
-        plt.imshow(initial_mask,cmap='gray')
+        plt.imshow(initial_mask.cpu(),cmap='gray')
         plt.title('Initial Mask\nLoss='+str(round(np.array(loss_greedy_list)[0],3)))
         plt.axis('off')
         plt.subplot(1,3,2)
-        plt.imshow(greedy_mask,cmap='gray')
-        plt.title('Greedy Mask\nNo. of lines='+str(sum(greedy_mask[0]))+'. Loss='+str(round(np.array(loss_greedy_list)[-1],3)))
+        plt.imshow(greedy_mask.cpu(),cmap='gray')
+        plt.title('Greedy Mask\nNo. of lines='+str(sum(greedy_mask[0]).item())+'. Loss='+str(round(np.array(loss_greedy_list)[-1],3)))
         plt.axis('off')
         plt.subplot(1,3,3)
         plt.plot(np.arange(len(loss_greedy_list))+1,np.array(loss_greedy_list))
@@ -135,4 +120,4 @@ def greedy_sampling_optimization(ksp, mps, img_gt, initial_mask, budget, model, 
         plt.ylabel('Loss')
         plt.savefig('greedy_mask_'+str(us_factor)+'x.png')
 
-    return greedy_mask, line_indices, np.array(loss_greedy_list)
+    return greedy_mask, loss_greedy_list

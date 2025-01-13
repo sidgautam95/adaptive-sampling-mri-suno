@@ -1,4 +1,5 @@
 # Code for training MoDL on set of multi-coil MR images undersampled by scan/slice adaptive masks
+# Paper: Aggarwal, Hemant K., Merry P. Mani, and Mathews Jacob. "MoDL: Model-based deep learning architecture for inverse problems." IEEE TMI 38.2 (2018): 394-405.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

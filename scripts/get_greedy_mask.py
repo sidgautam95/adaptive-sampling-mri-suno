@@ -1,5 +1,6 @@
 # Code for running greedy sampling optimization for a sample multicoil MRI scan/slice
 # User specifies the reconstruction method, metric used and the undersampling factor at which the mask is acquired.
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -11,7 +12,7 @@ from unet_fbr import Unet
 from utils import *
 from didn import DIDN
 import os
-from greedy_sampling_optimization import greedy_sampling_optimization
+from greedy_pytorch import greedy_sampling_optimization
 
 torch.set_num_threads(4)
 
@@ -20,7 +21,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = str(device_id)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Parameters of greedy algorithm
-recon = 'unet'#'unet' # choose reconstruction method
+recon = 'unet' # choose reconstruction method
 metric = 'nrmse' # choose metric
 nChannels=2 # No. of channels
 us_factor=4 # Undersampling factor
@@ -53,10 +54,10 @@ num_centre_lines = budget//3
 
 initial_mask = make_lf_mask(Height,Width,num_centre_lines) # Initializing with a low frequency mask
 
-# ksp = torch.tensor(ksp).to(device)
-# mps = torch.tensor(mps).to(device)
-# img_gt = torch.tensor(img_gt).to(device)
-# initial_mask = torch.tensor(initial_mask).to(device)
+ksp = torch.tensor(ksp).to(device)
+mps = torch.tensor(mps).to(device)
+img_gt = torch.tensor(img_gt).to(device)
+initial_mask = torch.tensor(initial_mask).to(device)
 
 
 greedy_mask, loss_greedy_list = greedy_sampling_optimization(ksp, mps, img_gt, initial_mask, budget, model, device=device, nChannels=nChannels, \
