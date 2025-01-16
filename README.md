@@ -36,12 +36,12 @@ $$
 
 **Datasets**: We used the publicly available fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) for our experiments, which can be downloaded at https://fastmri.med.nyu.edu/. 
 
-**Saved Models**: The saved models for running the code can be found at https://drive.google.com/drive/folders/1Ppog0VikG06vLUk6F63gn79pdAeAYL-F.
+**Saved Models**: The trained model weights for running the code can be found at https://drive.google.com/drive/folders/1Ppog0VikG06vLUk6F63gn79pdAeAYL-F.
 
 The code is made up of three components: 
-* ICD sampling algorithm
+* Sampling Optimization Algorithm
 * Nearest Neighbor Search
-* Training and Testing MoDL
+* Training and Testing Reconstruction Networks (MoDL and U-Net)
 
 ## ICD-based Sampling Optimization algorithm
 
@@ -51,7 +51,7 @@ Run `get_icd_mask.py` to get the ICD mask for a given choice of reconstructor, m
 3. Undersampling factor: 4x
 4. Initial Mask: Variable Density Random Sampling (VDRS)
 
-### ICD Output:
+### Output:
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_recon_4x.png)
 
@@ -61,6 +61,9 @@ At inference time, a nearest neighbor search based on proximity to low-frequency
 Run `nearest_neighbor_search.py` to get the nearest neighbor predicted mask (also called the SUNO mask).
 
 ## Training and Testing MoDL
+
+Run `data_preprocessing_modl.py` to preprocess the kspace, maps and ground truth data for MoDL and U-Net training the MoDL network.
+
 Run `train_modl.py` to train the MoDL network (https://ieeexplore.ieee.org/document/8434321) on a set of training images, undersampled by scan adaptive masks.
 
 Run `test_modl.py` to test the trained MoDL on the SUNO-predicted mask.
