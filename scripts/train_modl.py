@@ -8,7 +8,7 @@ import sys
 sys.path.append("../utils") 
 sys.path.append("../models")
 from modl_cg_functions import *
-import modl_cg_functions
+# import modl_cg_functions
 from didn import DIDN
 import matplotlib.pyplot as plt
 from unet_fbr import Unet
@@ -91,7 +91,7 @@ for epoch in range(nepochs): # iterate over epochs
             img_aliased = np.load(training_data_path + 'modl-training-data-4x-icd/val-img-aliased/val_img_aliased_'+scan+'_slc'+str(slc_idx)+'.npy')
             mask = np.load(training_data_path + 'modl-training-data-4x-icd/val-masks/val_masks_'+scan+'_slc'+str(slc_idx)+'.npy')
 
-            img_recon_modl = modl_recon_training(img_aliased, mask, mps, model, device=device)
+            img_recon_modl = modl_recon_training(img_aliased, mask, mps, model, device=device) # Getting validation output
 
             target = torch.tensor(img_gt).to(device).float().unsqueeze(0)
 
