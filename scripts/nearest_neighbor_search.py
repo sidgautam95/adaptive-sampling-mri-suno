@@ -30,18 +30,16 @@ def load_files_from_path(path):
     return np.array(img_list)
 
 # path of directory containing the pre-generated aliased images (adjoint reconstruction from low frequency kspace (A^H y_lf)) of training kspace
-img_aliased_train_path = '/egr/research-slim/shared/fastmri-multicoil/nearest-neighbor-prediction-data-fastmri-4x/train-img-aliased/'
+img_aliased_train_path = '../../train-img-aliased/'
 
 # directory containing the corresponding optimized scan adaptive masks
-train_masks_path = '/egr/research-slim/shared/fastmri-multicoil/nearest-neighbor-prediction-data-fastmri-4x/train-masks/'
+train_masks_path = '../../train-masks/'
 
 # making list of training aliased images and corresponding optimized scan adaptive masks
 img_aliased_train_list = load_files_from_path(img_aliased_train_path)
 train_masks_list = load_files_from_path(train_masks_path)
 
-img_aliased_test_path = '/egr/research-slim/shared/fastmri-multicoil/nearest-neighbor-prediction-data-fastmri-4x/test-img-aliased/'
-img_aliased_test_list = load_files_from_path(img_aliased_test_path)
-img_aliased_test = img_aliased_test_list[0]  # loading the test aliased image (adjoint reconstruction from low frequency kspace (A^H y_lf)) of test kspace
+img_aliased_test = np.load('../../img_aliased_test.npy') # loading the test aliased image (adjoint reconstruction from low frequency kspace (A^H y_lf)) of test kspace
 
 nTrain = len(img_aliased_train_list) # no. of training images
 
@@ -52,7 +50,7 @@ for i in range(nTrain):
 img_aliased_test=img_aliased_test/abs(img_aliased_test).max()
 
 ###################################################################
-# choosinhg metric used to compute nearest neighbors
+# choosing metric used to compute nearest neighbors
 metric = ['euc-dist']#['ksp-dist','ncc','man-dist']
 
 metric_value = np.zeros((nTrain))
@@ -61,7 +59,7 @@ metric_value = np.zeros((nTrain))
 img_aliased_test_expanded = np.expand_dims(img_aliased_test,axis=0).repeat(nTrain,0) 
 img_aliased_test_expanded = torch.tensor(img_aliased_test_expanded)
 
-# Compare the aliased aliasedstruction of test kspace with the aliasedstruction from training kspace
+# Compare the aliased reconstruction of test kspace with the reconstruction from training kspace
 metric_value = torch.linalg.matrix_norm(abs(img_aliased_test_expanded)-abs(img_aliased_train_list), axis=(1,2), ord='fro').detach().numpy()
 
 # sorting and getting the indices in increasing order
