@@ -2,9 +2,6 @@
 import numpy as np
 from torch import Tensor
 from modl_cg_functions import *
-from modl_cg_functions import CG_fn
-import modl_cg_functions
-
 
 def make_vdrs_mask(height,width,nlines,init_lines):
     
@@ -179,13 +176,13 @@ def preprocess_data(ksp,mps,mask,device=torch.device('cpu')):
     # Conversting to torch tensor
     mps_tensor = s_np.permute(1, 0, 2, 3) # Maps, shape: ncoils x nchannels x height x width
 
-    sense_recon = torch.sum(complex_matmul(A_I, complex_conj(mps_tensor)),dim=0) # S^H F^H y, shape: nchannels x height x width
+    adjoint_recon = torch.sum(complex_matmul(A_I, complex_conj(mps_tensor)),dim=0) # S^H F^H y, shape: nchannels x height x width
 
-    A_I = A_I/torch.max(torch.abs(sense_recon)[:]) # F^H y/|S^HF^Hy|_max
+    A_I = A_I/torch.max(torch.abs(adjoint_recon)[:]) # F^H y/|S^HF^Hy|_max
 
     A_k = fft2(A_I.permute(0,2,3,1)).permute(0,3,1,2) # F F^H y, kspace after taking FFT of normalized image: ncoils x nchannels x height x width
 
-    AT = modl_cg_functions.OPAT2(mps_tensor) # Initialize function for SENSE Reconstruction S^H F^H y
+    AT = OPAT2(mps_tensor) # Initialize function for SENSE Reconstruction S^H F^H y
 
     img = AT(A_k, mask) # Adjoint Reconstructed image: S^H F^H M y, shape: nchannels x height x width
 
