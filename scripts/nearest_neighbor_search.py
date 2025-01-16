@@ -13,7 +13,7 @@ from unet_fbr import Unet
 from modl_cg_functions import *
 import os
 
-
+# Function to load numpy files form a directory into a list
 def load_files_from_path(path):
 
     filenames = os.listdir(path)
@@ -29,7 +29,7 @@ def load_files_from_path(path):
 
     return np.array(img_list)
 
-# path of directory containing the pre-generated aliased images (adjoint aliasedstruction from low frequency kspace (A^H y_lf)) of training kspace
+# path of directory containing the pre-generated aliased images (adjoint reconstruction from low frequency kspace (A^H y_lf)) of training kspace
 img_aliased_train_path = '/egr/research-slim/shared/fastmri-multicoil/nearest-neighbor-prediction-data-fastmri-4x/train-img-aliased/'
 
 # directory containing the corresponding optimized scan adaptive masks
@@ -41,7 +41,7 @@ train_masks_list = load_files_from_path(train_masks_path)
 
 img_aliased_test_path = '/egr/research-slim/shared/fastmri-multicoil/nearest-neighbor-prediction-data-fastmri-4x/test-img-aliased/'
 img_aliased_test_list = load_files_from_path(img_aliased_test_path)
-img_aliased_test = img_aliased_test_list[0]  # loading the test aliased image (adjoint aliasedstruction from low frequency kspace (A^H y_lf)) of test kspace
+img_aliased_test = img_aliased_test_list[0]  # loading the test aliased image (adjoint reconstruction from low frequency kspace (A^H y_lf)) of test kspace
 
 nTrain = len(img_aliased_train_list) # no. of training images
 
@@ -52,7 +52,7 @@ for i in range(nTrain):
 img_aliased_test=img_aliased_test/abs(img_aliased_test).max()
 
 ###################################################################
-# choosinhe metric used to compute nearest neighbors
+# choosinhg metric used to compute nearest neighbors
 metric = ['euc-dist']#['ksp-dist','ncc','man-dist']
 
 metric_value = np.zeros((nTrain))
@@ -69,8 +69,9 @@ neighbor_indices = np.argsort(metric_value) # neighbor indices
 nearest_neighbor = neighbor_indices[0] # index of first/best nearest neighbor
 suno_mask = train_masks_list[nearest_neighbor] # choosing the SUNO mask
 
-np.save('suno_mask',suno_mask) 
+np.save('suno_mask',suno_mask) # Saving the SUNO predicted mask
 
+# Plotting the SUNO mask
 plt.figure()
 plt.imshow(suno_mask,cmap='gray')
 plt.axis('off')
