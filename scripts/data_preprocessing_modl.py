@@ -8,8 +8,6 @@ sys.path.append("../models")
 from modl_cg_functions import *
 from utils import *
 
-
-
 ## Data preprocessing            
 kspace_path = '/egr/research-slim/shared/fastmri-multicoil/fastmri-val-npz/'
 save_dir = 'modl-training-data/'
