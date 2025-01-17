@@ -1,5 +1,6 @@
 # Helper functions
 import numpy as np
+import torch
 from torch import Tensor
 from modl_cg_functions import *
 
