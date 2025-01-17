@@ -154,7 +154,7 @@ def preprocess_data(ksp,mps,mask,device=torch.device('cpu')):
         mask=torch.tensor(mask).to(device)
 
 
-    # Normalizing the kspace and senstivity maps by maximum value
+    # Normalizing the kspace and sensitivity maps by the maximum value
     # Separating into real and imaginary part
     k_r = torch.real(ksp)/abs(ksp).max()
     k_i = torch.imag(ksp)/abs(ksp).max()
@@ -164,7 +164,7 @@ def preprocess_data(ksp,mps,mask,device=torch.device('cpu')):
 
     ncoil, nx, ny = s_r.shape
    
-    # Making two channel image from real and imaginary part of kspace, maps and mask
+    # Making two-channel images from the real and imaginary parts of kspace, map,s and mask
     k_np = torch.stack((k_r, k_i), axis=0) # shape: nchannels x ncoils x nx x ny
     s_np = torch.stack((s_r,s_i), axis=0) # shape: nchannels x ncoils x nx x ny
 
@@ -174,7 +174,6 @@ def preprocess_data(ksp,mps,mask,device=torch.device('cpu')):
 
     A_I = ifft2(A_k.permute(0, 2, 3, 1)).permute(0, 3, 1, 2) # F^H y, shape: ncoils x nchannels x nx x ny
 
-    # Conversting to torch tensor
     mps_tensor = s_np.permute(1, 0, 2, 3) # Maps, shape: ncoils x nchannels x height x width
 
     adjoint_recon = torch.sum(complex_matmul(A_I, complex_conj(mps_tensor)),dim=0) # S^H F^H y, shape: nchannels x height x width
@@ -191,18 +190,18 @@ def preprocess_data(ksp,mps,mask,device=torch.device('cpu')):
 
 def unet_recon_batched(ksp,mps,masks, model, batch_size=4, device=torch.device('cpu')):
 
-    # Function runs UNET reconstruction on batches of images given kspace, sensitivity maps and mask.
+    # Function runs UNET reconstruction on batches of images given kspace, sensitivity maps, and mask.
     # Inputs
     # ksp: kspace - Batchsize x nCoils x height x width
     # mps: Sensitivity Maps - Batchsize x nCoils x height x width
     # mask: Mask - Batchsize x height x width
     
-    # Works for both batchsize 1 and multiple batches input
+    # Works for both batch-size 1 and multiple batch size
     # if input is only one slice/no. of dimension = 3, increase dimension by 1.
 
     # if batchsize=1, ksp_dim = 3 
     # if batchsize>1, ksp_dim = 4
-    #if only one mask is passed as an argument as a 2D array increase dimension by one and make it 1xheightxwidth
+    #if only one mask is passed as an argument as a 2D array increase the dimension by one and make it 1xheightxwidth
 
     if torch.is_tensor(masks)==False:
         masks=torch.tensor(masks).to(device)
@@ -240,7 +239,7 @@ def unet_recon_batched(ksp,mps,masks, model, batch_size=4, device=torch.device('
 
 
 
-def modl_recon_training(img_aliased, mask, mps, model, tol=1e-5, lamda=1e2, num_iter=6, device=torch.device('cpu'),print_loss=False):
+def modl_recon_training(img_aliased, mask, mps, model, tol=1e-5, lamda=1e2, num_iter=6, device=torch.device('cpu'), print_loss=False):
 
     # Function runs MoDL reconstruction
     # Input
@@ -303,18 +302,18 @@ def modl_recon(ksp,mps,mask, model, tol = 0.00001, lamda = 1e2, num_iter = 6, cr
     return img_recon_modl
 
 
-def modl_recon_batched(ksp,mps,masks, model, tol = 0.00001, lamda = 1e2, num_iter = 6, device=torch.device('cpu')):
+def modl_recon_batched(ksp, mps, masks, model, tol = 0.00001, lamda = 1e2, num_iter = 6, device = torch.device('cpu')):
 
-    # Function runs MoDL reconstruction on set of masks.
+    # Function runs MoDL reconstruction on the set of masks.
     # Inputs
     # ksp: Shape - nCoils x height x width
     # mps: Sensitivity Maps - nCoils x height x width
     # mask: Mask - Batchsize x height x width
     
-    # Works for both batchsize 1 and multiple batches input
+    # Works for both batch size 1 and multiple batch input
     # if input is only one slice/no. of dimension = 3, increase dimension by 1.
 
-    #if only one mask is passed as an argument as a 2D array increase dimension by one and make it 1xheightxwidth
+    #if only one mask is passed as an argument as a 2D array increase the dimension by one and make it 1xheightxwidth
     
     if masks.ndim==2:
          masks=(masks).unsqueeze(0)
@@ -327,8 +326,8 @@ def modl_recon_batched(ksp,mps,masks, model, tol = 0.00001, lamda = 1e2, num_ite
 
     img_recon = torch.zeros((nmasks,height,width),dtype=torch.complex64).to(device)
 
-    for count,mask in enumerate(masks):
+    for count, mask in enumerate(masks):
         with torch.no_grad(): # Gradient computation not required
-            img_recon[count] = modl_recon(ksp, mps, mask, model, tol, lamda, device=device) # Doing MoDL reconstruction with two channel
+            img_recon[count] = modl_recon(ksp, mps, mask, model, tol, lamda, device=device) # Doing MoDL reconstruction
 
     return torch.squeeze(img_recon)
