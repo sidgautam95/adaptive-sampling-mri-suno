@@ -3,14 +3,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import time
 import sys
 sys.path.append("../utils") 
 sys.path.append("../models")
 sys.path.append("../sampling-optimization")
 from unet_fbr import Unet
-from utils import *
 from didn import DIDN
+from utils import *
 import os
 from icd_sampling_optimization import icd_sampling_optimization
 
