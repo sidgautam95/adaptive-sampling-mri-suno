@@ -9,22 +9,22 @@ def make_vdrs_mask(height,width,budget,num_centre_lines):
     mask_vdrs=np.zeros((height,width),dtype='bool')
     
     # settint the low frequencies to true
-    low1=(width-init_lines)//2
-    low2=(width+init_lines)//2
+    low1=(width-num_centre_lines)//2
+    low2=(width+num_centre_lines)//2
     mask_vdrs[:,low1:low2]=True
     
-    nlinesout=(nlines-init_lines)//2
+    budgetout=(budget-num_centre_lines)//2
     rng = np.random.default_rng()
-    t1 = rng.choice(low1-1, size=nlinesout+1, replace=False)
-    t2 = rng.choice(np.arange(low2+1, width), size=nlinesout, replace=False)
+    t1 = rng.choice(low1-1, size=budgetout+1, replace=False)
+    t2 = rng.choice(np.arange(low2+1, width), size=budgetout, replace=False)
     mask_vdrs[:,t1]=True 
     mask_vdrs[:,t2]=True
     
     return mask_vdrs
 
-def make_lf_mask(height,width,nlines):
+def make_lf_mask(height,width,budget):
     mask_lf=np.zeros((height,width),dtype='bool');
-    mask_lf[:,(width-nlines)//2:(width+nlines)//2]=True
+    mask_lf[:,(width-budget)//2:(width+budget)//2]=True
     return mask_lf
 
 
