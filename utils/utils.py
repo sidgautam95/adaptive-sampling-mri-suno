@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 from modl_cg_functions import *
 
-def make_vdrs_mask(height,width,nlines,init_lines):
+def make_vdrs_mask(height,width,budget,num_centre_lines):
     
     mask_vdrs=np.zeros((height,width),dtype='bool')
     
