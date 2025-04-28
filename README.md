@@ -12,10 +12,15 @@ Using a training set consisting of fully sampled $k$-space and corresponding gro
 
 
 $$
-\underset{\theta, M_i}{\min} \sum_{i=1}^N || f_{\theta} ({A}_i^H {M}_i \mathbf{y}^{full}_i ) - \mathbf{x}^{gt}_i ||_2^2
+\underset{\theta, M_i}{\min} \sum_{i=1}^N ‖ f_{\theta} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{\mathrm{full}}_i ) - \mathbf{x}^{\mathrm{gt}}_i ‖_2^2
 $$
 
-where M is the ith training mask that inserts zeros at non-sampled locations, y_full and x_gt are the ith fully-sampled multi-coil training $k$-space and the corresponding ground truth image, respectively and $N$ is the number of training images. $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget. $A_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the ith training scan, and $f_{\theta}$ is the reconstruction network trained on the set of sampling patterns $M_i$'s. 
+where $\mathbf{M}_i$ is the ith training mask that inserts zeros at non-sampled locations,
+$\mathbf{y}^{\mathrm{full}}$ and $\mathbf{x}^{\mathrm{gt}}$
+are the ith fully-sampled multi-coil training $k$-space and the corresponding ground truth image, respectively and $N$ is the number of training images.
+$\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget.
+$\mathbf{A}_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the ith training scan,
+and $f_{\theta}$ is the reconstruction network trained on the set of sampling patterns $\mathbf{M}_i$'s. 
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png)
 
@@ -26,7 +31,7 @@ where M is the ith training mask that inserts zeros at non-sampled locations, y_
 Given our collection of scan-adaptive ICD sampling patterns obtained from the training process, the task at the test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
 
 $$
-d_i =  d(A^H M_{lf} y_{test}, A^H M_{lf} y_{train_i})
+d_i =  d(\mathbf{A}^H \mathbf{M}_{\mathrm{lf}} y_{\mathrm{test}}, \mathbf{A}^H \mathbf{M}_{lf} y_{\mathrm{train}_i})
 $$
 
 
