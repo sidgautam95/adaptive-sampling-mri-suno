@@ -11,9 +11,10 @@ In this paper, we propose a novel approach for jointly learning a set of scan-ad
 Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive sampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
 
 
-$$
-\underset{\theta, M_i}{\min} \sum_{i=1}^N ‖ f_{\theta} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{\mathrm{full}}_i ) - \mathbf{x}^{\mathrm{gt}}_i ‖_2^2
-$$
+![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/joint_optimization_equation.png)
+
+<!-- $$ \underset{\theta, M_i}{\min} \sum_{i=1}^N ‖ f_{\theta} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{\mathrm{full}}_i ) - \mathbf{x}^{\mathrm{gt}}_i ‖_2^2 $$ -->
+
 
 where $\mathbf{M}_i$ is the ith training mask that inserts zeros at non-sampled locations,
 $\mathbf{y}^{\mathrm{full}}$ and $\mathbf{x}^{\mathrm{gt}}$
