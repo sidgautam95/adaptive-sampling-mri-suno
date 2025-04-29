@@ -31,6 +31,9 @@ and $f_{\theta}$ is the reconstruction network trained on the set of sampling pa
 ### Nearest Neighbor Search:
 Given our collection of scan-adaptive ICD sampling patterns obtained from the training process, the task at the test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
 
+
+![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/neighbor_finding_equation.png)
+
 $$
 d_i =  d(A^H M_{lf} y_{test}, A^H M_{lf} y_{train_i})
 $$
