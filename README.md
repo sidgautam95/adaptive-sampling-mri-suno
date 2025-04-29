@@ -13,9 +13,6 @@ Using a training set consisting of fully sampled $k$-space and corresponding gro
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/joint_optimization_equation.png)
 
-<!-- $$ \underset{\theta, M_i}{\min} \sum_{i=1}^N ‖ f_{\theta} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{\mathrm{full}}_i ) - \mathbf{x}^{\mathrm{gt}}_i ‖_2^2 $$ -->
-
-
 where $\mathbf{M}_i$ is the ith training mask that inserts zeros at non-sampled locations,
 $\mathbf{y}^{\mathrm{full}}$ and $\mathbf{x}^{\mathrm{gt}}$
 are the ith fully-sampled multi-coil training $k$-space and the corresponding ground truth image, respectively and $N$ is the number of training images.
