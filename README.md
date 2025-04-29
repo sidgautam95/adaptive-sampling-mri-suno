@@ -31,6 +31,8 @@ Given our collection of scan-adaptive ICD sampling patterns obtained from the tr
 
 ![alt text](https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/neighbor_finding_equation.png)
 
+The test-time pipeline uses the predicted sampling mask from nearest neighbor search, as illustrated below:
+
 ![alt text](https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/mri_testing_pipeline_nn.png)
 
 **Datasets**: We used the publicly available fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) for our experiments, which can be downloaded at https://fastmri.med.nyu.edu/. 
