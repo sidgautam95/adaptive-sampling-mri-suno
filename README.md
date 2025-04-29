@@ -34,9 +34,6 @@ Given our collection of scan-adaptive ICD sampling patterns obtained from the tr
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/neighbor_finding_equation.png)
 
-$$
-d_i =  d(A^H M_{lf} y_{test}, A^H M_{lf} y_{train_i})
-$$
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/mri_testing_pipeline_nn.png)
 
