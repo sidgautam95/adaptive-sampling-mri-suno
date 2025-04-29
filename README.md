@@ -34,6 +34,8 @@ $$
 d_i =  d(\mathbf{A}^H \mathbf{M}_{\mathrm{lf}} y_{\mathrm{test}}, \mathbf{A}^H \mathbf{M}_{lf} y_{\mathrm{train}_i})
 $$
 
+![Equation](https://latex.codecogs.com/png.latex?d_i%20%3D%20d%28%5Cmathbf%7BA%7D%5EH%20%5Cmathbf%7BM%7D_%7B%5Cmathrm%7Blf%7D%7D%20y_%7B%5Cmathrm%7Btest%7D%7D%2C%20%5Cmathbf%7BA%7D%5EH%20%5Cmathbf%7BM%7D_%7Blf%7D%20y_%7B%5Cmathrm%7Btrain%7D_i%7D%29)
+
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/mri_testing_pipeline_nn.png)
 
