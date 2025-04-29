@@ -20,10 +20,11 @@ $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a speci
 $\mathbf{A}_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the ith training scan,
 and $f_{\theta}$ is the reconstruction network trained on the set of sampling patterns $\mathbf{M}_i$'s. 
 
-
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png)
 
 ### Getting Scan-adaptive masks:
+
+![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/mri_train_pipeline.png)
 
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/mri_train_pipeline.png)
 
