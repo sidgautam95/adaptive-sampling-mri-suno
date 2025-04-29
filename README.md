@@ -22,6 +22,7 @@ $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a speci
 $\mathbf{A}_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the ith training scan,
 and $f_{\theta}$ is the reconstruction network trained on the set of sampling patterns $\mathbf{M}_i$'s. 
 
+
 ![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/icd_alternating.png)
 
 ### Getting Scan-adaptive masks:
@@ -30,11 +31,10 @@ and $f_{\theta}$ is the reconstruction network trained on the set of sampling pa
 ### Nearest Neighbor Search:
 Given our collection of scan-adaptive ICD sampling patterns obtained from the training process, the task at the test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
 
-$$
-d_i =  d(\mathbf{A}^H \mathbf{M}_{\mathrm{lf}} y_{\mathrm{test}}, \mathbf{A}^H \mathbf{M}_{lf} y_{\mathrm{train}_i})
-$$
 
-![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/neighbor_finding_equation.png)
+<!-- -->!$$d_i =  d(\mathbf{A}^H \mathbf{M}_{\mathrm{lf}} y_{\mathrm{test}}, \mathbf{A}^H \mathbf{M}_{lf} y_{\mathrm{train}_i})$$
+
+[alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/neighbor_finding_equation.png)
 
 
 ![equation](https://latex.codecogs.com/svg.image?d_i=d(\mathbf{A}^H\mathbf{M}_{\mathrm{lf}}\mathbf{y}_{\mathrm{test}},\mathbf{A}^H\mathbf{M}_{\mathrm{lf}}\mathbf{y}_{\mathrm{train}_i}))
