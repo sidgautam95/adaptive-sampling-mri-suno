@@ -34,7 +34,7 @@ Given our collection of scan-adaptive ICD sampling patterns obtained from the tr
 
 <!-- -->!$$d_i =  d(\mathbf{A}^H \mathbf{M}_{\mathrm{lf}} y_{\mathrm{test}}, \mathbf{A}^H \mathbf{M}_{lf} y_{\mathrm{train}_i})$$
 
-[alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/neighbor_finding_equation.png)
+![alt text](https://github.com/sidgautam95/adaptive-sampling-mri-suno/blob/main/figures/neighbor_finding_equation.png)
 
 
 ![equation](https://latex.codecogs.com/svg.image?d_i=d(\mathbf{A}^H\mathbf{M}_{\mathrm{lf}}\mathbf{y}_{\mathrm{test}},\mathbf{A}^H\mathbf{M}_{\mathrm{lf}}\mathbf{y}_{\mathrm{train}_i}))
