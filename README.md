@@ -25,7 +25,9 @@ and $f_{\theta}$ is the reconstruction network trained on the set of sampling pa
 ---
 ### Getting Scan-adaptive masks:
 
-![alt text](https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/mri_train_pipeline.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/mri_train_pipeline.png" alt="alt text" />
+</p>
 
 ---
 ### Nearest Neighbor Search:
