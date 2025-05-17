@@ -9,18 +9,26 @@ Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravi
 In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
 Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive sampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
 
+
 <p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/joint_optimization_equation.png" alt="alt text" />
+$$
+\underset{\theta, M_i}{\min}
+\sum_{i=1}^N
+\big\|
+  f_{\theta}\big(\mathbf{A}_i^H \,\mathbf{M}_i\, \mathbf{y}^{\mathrm{full}}_i\big)
+  - \mathbf{x}^{\mathrm{gt}}_i
+\big\|_2^2
+$$
 </p>
 
-<!-- $$ \underset{\theta, M_i}{\min} \sum_{i=1}^N ‖ f_{\theta} (\mathbf{A}_i^H \mathbf{M}_i \mathbf{y}^{\mathrm{full}}_i ) - \mathbf{x}^{\mathrm{gt}}_i ‖_2^2 $$ -->
+where:
 
-where $\mathbf{M}_i$ is the ith training mask that inserts zeros at non-sampled locations,
-$\mathbf{y}^{\mathrm{full}}$ and $\mathbf{x}^{\mathrm{gt}}$
-are the ith fully-sampled multi-coil training $k$-space and the corresponding ground truth image, respectively and $N$ is the number of training images.
-$\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget.
-$\mathbf{A}_i^H$ is the adjoint of the fully-sampled multicoil MRI measurement operator for the ith training scan,
-and $f_{\theta}$ is the reconstruction network trained on the set of sampling patterns $\mathbf{M}_i$'s. 
+- $\mathbf{M}_i$ is the $i$-th training mask that inserts zeros at non-sampled locations.
+- $\mathbf{y}^{\mathrm{full}}_i$ and $\mathbf{x}^{\mathrm{gt}}_i$ are the fully-sampled multi-coil $k$-space data and the corresponding ground-truth image for the $i$-th scan, respectively.
+- $N$ is the total number of training images.
+- $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget.
+- $\mathbf{A}_i^H$ is the adjoint of the fully-sampled multi-coil MRI measurement operator for the $i$-th training scan.
+- $f_{\theta}$ is the reconstruction network parameterized by $\theta$, trained on the set of sampling patterns $\{\mathbf{M}_i\}_{i=1}^N$.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/icd_alternating.png" alt="alt text" />
