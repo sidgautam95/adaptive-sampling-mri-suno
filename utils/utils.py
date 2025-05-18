@@ -130,7 +130,7 @@ def plot_mr_image(img,title='',Vmax=0.7,colorbar=False,normalize=True,crop=True)
 
     img = np.flipud(abs(img)) # flip up-down for knee MR image
 
-    plt.imshow(abs(img),cmap='gray',vmax=Vmax) # flip left right for cardiac MR image
+    plt.imshow(abs(img),cmap='gray',vmax=Vmax)
 
     plt.axis('off')
     plt.title(title)
