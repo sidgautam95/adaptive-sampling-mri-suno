@@ -4,23 +4,50 @@ import torch
 from torch import Tensor
 from modl_cg_functions import *
 
-def make_vdrs_mask(height,width,budget,num_centre_lines):
+
+def make_vdrs_mask(height, width, budget, num_centre_lines, power=4.0, seed=None):
+    """
+    1D variable-density random sampling along the 'width' (ky) axis, broadcast across 'height'.
+    - budget: total number of ky lines to sample (including the ACS block)
+    - num_centre_lines: fully-sampled ACS size (must be even)
+    - power: VD exponent (higher -> more center-heavy)
+    """
+    if num_centre_lines % 2 != 0:
+        raise ValueError("num_centre_lines should be even.")
+    if budget < num_centre_lines or budget > width:
+        raise ValueError("budget must be in [num_centre_lines, width].")
     
-    mask_vdrs=np.zeros((height,width),dtype='bool')
-    
-    # settint the low frequencies to true
-    low1=(width-num_centre_lines)//2
-    low2=(width+num_centre_lines)//2
-    mask_vdrs[:,low1:low2]=True
-    
-    budgetout=(budget-num_centre_lines)//2
-    rng = np.random.default_rng()
-    t1 = rng.choice(low1-1, size=budgetout+1, replace=False)
-    t2 = rng.choice(np.arange(low2+1, width), size=budgetout, replace=False)
-    mask_vdrs[:,t1]=True 
-    mask_vdrs[:,t2]=True
-    
-    return mask_vdrs
+    rng = np.random.default_rng(seed)
+    mask = np.zeros((height, width), dtype=bool)
+
+    # ACS block (centered)
+    c1 = (width - num_centre_lines) // 2
+    c2 = c1 + num_centre_lines
+    mask[:, c1:c2] = True
+
+    M_rest = budget - num_centre_lines
+    if M_rest == 0:
+        return mask
+
+    # Variable-density PDF over ky
+    ky = np.arange(width)
+    kc = (width - 1) / 2.0
+    d = np.abs(ky - kc)                 # distance from center
+    dmax = d.max() if d.max() > 0 else 1.0
+
+    # Probability highest near center, lowest at edges (polynomial VD)
+    # e.g., p(k) ∝ (1 - (d/dmax))^power
+    w = (1.0 - d / dmax) ** power
+    w[c1:c2] = 0.0                      # exclude ACS; they’re already selected
+    s = w.sum()
+    if s <= 0:
+        raise RuntimeError("VD weights degenerate; check width/ACS/power.")
+    probs = w / s
+
+    # Sample remaining lines without replacement using the VD probabilities
+    extra = rng.choice(ky, size=M_rest, replace=False, p=probs)
+    mask[:, extra] = True
+    return mask
 
 def make_lf_mask(height,width,budget):
     mask_lf=np.zeros((height,width),dtype='bool');
