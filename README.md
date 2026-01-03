@@ -98,7 +98,7 @@ The MoDL data preprocessing component is inspired by https://github.com/JeffFess
 ### SUNO mask with other baselines at 4x acceleration factor:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/icd_vs_baseline_masks_fastmri_4x.png" alt="alt text" />
+  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/baseline_masks_4x.png" alt="alt text" />
 </p>
 
 ### Reconstructed Images at 4x:
