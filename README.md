@@ -7,7 +7,7 @@ Siddhant Gautam, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravi
 
 ### Alternating training framework:
 In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
-Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive sampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
+Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive undersampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
 
 
 <p align="center">
@@ -43,7 +43,7 @@ where:
 
 ---
 ### Nearest Neighbor Search:
-Given our collection of scan-adaptive ICD sampling patterns obtained from the training process, the task at the test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
+Given our collection of scan-adaptive sampling patterns obtained from the training process, the task at test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/neighbor_finding_equation.png" alt="alt text" />
