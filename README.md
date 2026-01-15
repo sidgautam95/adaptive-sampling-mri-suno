@@ -8,7 +8,7 @@ Python implementation for the paper:
 *IEEE Transactions on Computational Imaging*, pp. 1–13, Jan. 2026  
 
 **DOI:** 10.1109/TCI.2026.3653330  
-**IEEE Xplore:** https://ieeexplore.ieee.org/document/3653330  
+**IEEE Xplore:** https://ieeexplore.ieee.org/document/11346972
 
 ### Alternating training framework:
 In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
