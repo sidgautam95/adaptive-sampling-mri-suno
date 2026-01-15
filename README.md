@@ -5,7 +5,7 @@ Python implementation for the paper:
 
 **Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)**  
 **Siddhant Gautam**, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar  
-*IEEE Transactions on Computational Imaging*, Early Access, pp. 1–13, Jan. 2026  
+*IEEE Transactions on Computational Imaging*, pp. 1–13, Jan. 2026  
 
 **DOI:** 10.1109/TCI.2026.3653330  
 **IEEE Xplore:** https://ieeexplore.ieee.org/document/3653330  
