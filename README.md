@@ -114,5 +114,20 @@ The MoDL data preprocessing component is inspired by https://github.com/JeffFess
 
 The SUNO masks outperform the baseline masks at 4x. The bottom row shows the region of interest.
 
+## Citation
+If you use this code or the SUNO framework in your research, please cite:
+
+```bibtex
+@article{gautam2026suno,
+  title={Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)},
+  author={Gautam, Siddhant and Li, Angqi and Seiberlich, Nicole and Fessler, Jeffrey A. and Ravishankar, Saiprasad},
+  journal={IEEE Transactions on Computational Imaging},
+  year={2026},
+  pages={1--13},
+  doi={10.1109/TCI.2026.3653330},
+  publisher={IEEE}
+}
+```
+
 **Contact**  
 The code is provided to support reproducible research. If you have any questions about the code or have some trouble running any module of the framework, you can contact me at gautamsi@msu.edu.
