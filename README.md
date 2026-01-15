@@ -7,7 +7,7 @@ Python implementation for the paper:
 **Siddhant Gautam**, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar  
 *IEEE Transactions on Computational Imaging*, pp. 1–13, Jan. 2026  
 
-**DOI:** 10.1109/TCI.2026.3653330  
+**DOI:** 10.1109/TCI.2026.3653330 
 **IEEE Xplore:** https://ieeexplore.ieee.org/document/11346972
 
 ### Alternating training framework:
