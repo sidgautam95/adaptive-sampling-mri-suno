@@ -131,4 +131,5 @@ If you use this code or the SUNO framework in your research, please cite:
 ```
 
 **Contact**  
-The code is provided to support reproducible research. If you have any questions about the code or have some trouble running any module of the framework, you can contact me at gautamsi@msu.edu.
+The code is provided to support reproducible research. If you have any questions about the code or have some trouble running any module of the framework, you can contact Siddhant Gautam (gautamsi@msu.edu) or Saiprasad Ravishankar (ravisha3@msu.edu).
+
