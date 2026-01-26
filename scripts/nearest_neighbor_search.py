@@ -15,19 +15,36 @@ import os
 
 # Function to load numpy files form a directory into a list
 def load_files_from_path(path):
+    """
+    Load all NumPy (.npy) files from a directory, apply center cropping,
+    and return them as a single NumPy array.
 
-    filenames = os.listdir(path)
+    Parameters
+    ----------
+    path : str
+        Path to the directory containing .npy files.
 
+    Returns
+    -------
+    np.ndarray
+        Array containing all loaded and cropped images.
+    """
+    filenames = sorted(os.listdir(path))
     img_list = []
 
-    for file in filenames:
+    for fname in filenames:
+        file_path = os.path.join(path, fname)
 
-        img=np.load(path+file)
-        img = crop_img(img,640,368)
+        if not fname.endswith(".npy"):
+            continue
+
+        img = np.load(file_path)
+        img = crop_img(img, 640, 368)
 
         img_list.append(img)
 
     return np.array(img_list)
+
 
 # path of directory containing the pre-generated aliased images (adjoint reconstruction from low frequency kspace (A^H y_lf)) of training kspace
 img_aliased_train_path = '../../train-img-aliased/'
