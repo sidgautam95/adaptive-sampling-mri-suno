@@ -12,9 +12,10 @@ from utils import *
 kspace_path = '/egr/research-slim/shared/fastmri-multicoil/fastmri-val-npz/'
 save_dir = 'modl-training-data/'
 
-# Divide scans into training and validation and load them into seprate lists
-training_scans = open('/egr/research-slim/shared/fastmri-multicoil/fastmri_training_scans.txt', 'r').readlines() 
-validation_scans = open('/egr/research-slim/shared/fastmri-multicoil/fastmri_validation_scans.txt', 'r').readlines()
+# Optional: text files listing training and validation scans
+# Please create your own random split
+training_scans_file   = "/path/to/train_scans.txt"   # <-- CHANGE THIS
+validation_scans_file = "/path/to/val_scans.txt"     # <-- CHANGE THIS
 
 total_scans = training_scans + validation_scans
 
