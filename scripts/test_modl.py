@@ -28,7 +28,7 @@ model.to(device)
 model.eval();
 print('MoDL loaded from',modl_path)
 
-# Choose fully sampled kspace and the corresponding coil sensitivity maps of test k-space
+# Choose fully sampled kspace and the corresponding coil sensitivity maps of test k-space (download from fastMRI dataset)
 ksp = np.load('../../data/ksp.npy')
 mps = np.load('../../data/mps.npy')
 mask = np.load('suno_mask.npy') # choosing SUNO mask
