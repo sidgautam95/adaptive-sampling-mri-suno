@@ -36,7 +36,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min') # lr sc
 
 # path of directory containing the training data:
 # Needed data: 1. aliased images, 2. ground truth, 3. sensitivity maps, 4. masks
-training_data_path = '/egr/research-slim/shared/fastmri-multicoil/modl-training-data-uncropped/'
+training_data_path = 'modl-training-data/' # add path of the directory containing the training and validation dataset
 
 # Each training and validation (.npy) file contains only one slice of a particular scan
 train_filenames = os.listdir(training_data_path + 'modl-training-data-4x-icd/train-img-aliased') # Getting the training filenames
