@@ -1,123 +1,175 @@
-# Code for training MoDL on set of multi-coil MR images undersampled by scan/slice adaptive masks
-# Paper: Aggarwal, Hemant K., Merry P. Mani, and Mathews Jacob. "MoDL: Model-based deep learning architecture for inverse problems." IEEE TMI 38.2 (2018): 394-405.
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import sys
-sys.path.append("../utils") 
-sys.path.append("../models")
-from modl_cg_functions import *
-# import modl_cg_functions
-from didn import DIDN
-import matplotlib.pyplot as plt
-from unet_fbr import Unet
-from utils import *
+"""
+Train MoDL (DIDN-based) on multicoil MR images undersampled by scan/slice-adaptive masks.
+
+Reference:
+Aggarwal, Hemant K., Merry P. Mani, and Mathews Jacob.
+"MoDL: Model-based deep learning architecture for inverse problems."
+IEEE TMI 38.2 (2018): 394-405.
+"""
+
 import os
+import sys
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
 
-torch.cuda.empty_cache()
-    
-device_id = 1
-os.environ['CUDA_VISIBLE_DEVICES'] = str(device_id)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+sys.path.append("../utils")
+sys.path.append("../models")
 
-model = DIDN(2, 2, num_chans=64, pad_data=True, global_residual=True, n_res_blocks=2)
-model = model.float().to(device)
+from didn import DIDN
+from modl_cg_functions import modl_recon_training  # assumes this exists
+from utils import loss_fn  # assumes loss_fn exists (NRMSE etc.)
 
+# -------------------------------------------------------------------------
+# USER SETTINGS (PLEASE UPDATE THESE)
+# -------------------------------------------------------------------------
 
-learning_rate = 1e-4 # learning rate
-nepochs = 100 # no. of epochs
-tol = 1e-5 # tolerance for CG algorithm
-lamda = 1e2 # weighting factor
-num_iter = 6 # No. of unrolling of denoiser and CG block
+# Root directory produced by your preprocessing step.
+# Expected subfolders:
+#   train-img-aliased, train-masks, train-img-gt, train-maps,
+#   val-img-aliased,   val-masks,   val-img-gt,   val-maps
+data_root = "modl-training-data/"    # <-- CHANGE THIS
 
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) # Optimizer
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min') # lr scheduler
+# Training hyperparameters
+learning_rate = 1e-4
+nepochs = 100
 
-# path of directory containing the training data:
-# Needed data: 1. aliased images, 2. ground truth, 3. sensitivity maps, 4. masks
-training_data_path = 'modl-training-data/' # add path of the directory containing the training and validation dataset
+# Model configuration (kept consistent with your current setup)
+nChannels = 2
+num_modl_iter = 6   # used inside modl_recon_training if applicable
 
-# Each training and validation (.npy) file contains only one slice of a particular scan
-train_filenames = os.listdir(training_data_path + 'modl-training-data-4x-icd/train-img-aliased') # Getting the training filenames
-val_filenames = os.listdir(training_data_path + 'modl-training-data-4x-icd/val-img-aliased') # Getting the validation filenames
+# Output files
+out_model_path = "model.pt"
+out_loss_plot = "loss.png"
 
-ntrain = len(train_filenames) # no. of training images/slices
-nval = len(val_filenames) # no. of validation images
+# -------------------------------------------------------------------------
+# DEVICE SETUP
+# -------------------------------------------------------------------------
 
-train_loss = []
-val_loss = []
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
-for epoch in range(nepochs): # iterate over epochs
+# -------------------------------------------------------------------------
+# MODEL / OPTIMIZER
+# -------------------------------------------------------------------------
 
-    # initialize total training and validation loss for a particular epoch
-    train_loss_total = 0
-    val_loss_total = 0
+model = DIDN(nChannels, nChannels, num_chans=64, pad_data=True,
+             global_residual=True, n_res_blocks=2).float().to(device)
 
-    for idx in range(ntrain): # iterate over training images
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min")
 
-        # Getting the scan name and slice index
-        scan = train_filenames[idx][18:29]
-        slc_idx = train_filenames[idx][33:-4]
+# -------------------------------------------------------------------------
+# FILE LISTS
+# -------------------------------------------------------------------------
 
-        # Load the training (two-channel) ground truth, aliased image (A^H My), and the undersampling mask, sensitivity maps
-        img_gt = np.load(training_data_path + 'train-img-gt/train_img_gt_'+scan+'_slc'+str(slc_idx)+'.npy')
-        img_aliased = np.load(training_data_path + 'modl-training-data-4x-icd/train-img-aliased/train_img_aliased_'+scan+'_slc'+str(slc_idx)+'.npy')
-        mask = np.load(training_data_path + 'modl-training-data-4x-icd/train-masks/train_masks_'+scan+'_slc'+str(slc_idx)+'.npy')
-        mps = np.load(training_data_path + 'train-maps/train_maps_'+scan+'_slc'+str(slc_idx)+'.npy')
+train_aliased_dir = os.path.join(data_root, "train-img-aliased")
+val_aliased_dir   = os.path.join(data_root, "val-img-aliased")
 
-        img_recon_modl = modl_recon_training(img_aliased, mask, mps, model, device=device) # Performing MoDL reconstruction
+train_filenames = sorted([f for f in os.listdir(train_aliased_dir) if f.endswith(".npy")])
+val_filenames   = sorted([f for f in os.listdir(val_aliased_dir) if f.endswith(".npy")])
+
+ntrain = len(train_filenames)
+nval = len(val_filenames)
+
+if ntrain == 0 or nval == 0:
+    raise RuntimeError("No training/validation files found. Please check data_root and subfolder names.")
+
+train_loss_hist = []
+val_loss_hist = []
+
+# -------------------------------------------------------------------------
+# HELPER: PARSE SCAN ID AND SLICE INDEX FROM FILENAME
+# Expected pattern: train_img_aliased_<scan>_slc<idx>.npy (or val_...)
+# -------------------------------------------------------------------------
+
+def parse_scan_and_slice(fname):
+    base = os.path.splitext(fname)[0]  # remove .npy
+    # Example: train_img_aliased_..._slc12
+    if "_slc" not in base:
+        raise ValueError(f"Filename does not contain '_slc': {fname}")
+    prefix, slc_str = base.rsplit("_slc", 1)
+    scan = prefix.split("_")[-1]       # last token before _slc
+    slc_idx = slc_str
+    return scan, slc_idx
+
+# -------------------------------------------------------------------------
+# TRAINING LOOP
+# -------------------------------------------------------------------------
+
+for epoch in range(nepochs):
+
+    model.train()
+    train_loss_total = 0.0
+
+    for fname in train_filenames:
+
+        scan, slc_idx = parse_scan_and_slice(fname)
+
+        # Load training arrays
+        img_gt = np.load(os.path.join(data_root, f"train-img-gt/train_img_gt_{scan}_slc{slc_idx}.npy"))
+        img_aliased = np.load(os.path.join(data_root, f"train-img-aliased/train_img_aliased_{scan}_slc{slc_idx}.npy"))
+        mask = np.load(os.path.join(data_root, f"train-masks/train_masks_{scan}_slc{slc_idx}.npy"))
+        mps = np.load(os.path.join(data_root, f"train-maps/train_maps_{scan}_slc{slc_idx}.npy"))
+
+        # Forward (MoDL reconstruction)
+        img_recon_modl = modl_recon_training(img_aliased, mask, mps, model, device=device)
 
         target = torch.tensor(img_gt).to(device).float().unsqueeze(0)
 
-        optimizer.zero_grad() # Zero out the gradient
-        loss = loss_fn(target, img_recon_modl) # computing loss (NRMSE)
-        loss.backward() # Computing gradient
-        optimizer.step() # Perform the optimization step to update parameters
+        optimizer.zero_grad()
+        loss = loss_fn(target, img_recon_modl)
+        loss.backward()
+        optimizer.step()
 
-        train_loss_total += float(loss) # computing total loss over all training samples
+        train_loss_total += float(loss)
 
-    with torch.no_grad(): # gradient computation not required
+    # ---------------------------------------------------------------------
+    # VALIDATION
+    # ---------------------------------------------------------------------
 
-        for idx in range(nval): # iterate over validation images
+    model.eval()
+    val_loss_total = 0.0
 
-            # Getting the scan name and slice index
-            scan = val_filenames[idx][16:27]
-            slc_idx = val_filenames[idx][31:-4]
+    with torch.no_grad():
+        for fname in val_filenames:
 
-            # Load the validation (two-channel) ground truth, aliased image (A^H My), and the undersampling mask, sensitivity maps
-            img_gt = np.load(training_data_path + 'val-img-gt/val_img_gt_'+scan+'_slc'+str(slc_idx)+'.npy')
-            mps = np.load(training_data_path + 'val-maps/val_maps_'+scan+'_slc'+str(slc_idx)+'.npy')
-            img_aliased = np.load(training_data_path + 'modl-training-data-4x-icd/val-img-aliased/val_img_aliased_'+scan+'_slc'+str(slc_idx)+'.npy')
-            mask = np.load(training_data_path + 'modl-training-data-4x-icd/val-masks/val_masks_'+scan+'_slc'+str(slc_idx)+'.npy')
+            scan, slc_idx = parse_scan_and_slice(fname)
 
-            img_recon_modl = modl_recon_training(img_aliased, mask, mps, model, device=device) # Getting validation output
+            img_gt = np.load(os.path.join(data_root, f"val-img-gt/val_img_gt_{scan}_slc{slc_idx}.npy"))
+            img_aliased = np.load(os.path.join(data_root, f"val-img-aliased/val_img_aliased_{scan}_slc{slc_idx}.npy"))
+            mask = np.load(os.path.join(data_root, f"val-masks/val_masks_{scan}_slc{slc_idx}.npy"))
+            mps = np.load(os.path.join(data_root, f"val-maps/val_maps_{scan}_slc{slc_idx}.npy"))
 
+            img_recon_modl = modl_recon_training(img_aliased, mask, mps, model, device=device)
             target = torch.tensor(img_gt).to(device).float().unsqueeze(0)
 
             loss = loss_fn(target, img_recon_modl)
-
             val_loss_total += float(loss)
 
-    torch.cuda.empty_cache()
-    
-    scheduler.step(val_loss_total/nval) # Using LR scheduler to prevent overfitting
+    train_loss_epoch = train_loss_total / ntrain
+    val_loss_epoch = val_loss_total / nval
 
-    train_loss.append(train_loss_total/ntrain)
-    val_loss.append(val_loss_total/nval)
+    train_loss_hist.append(train_loss_epoch)
+    val_loss_hist.append(val_loss_epoch)
 
-    # printing training and validation loss for each epoch
-    print('Epoch: {:d} | Training Loss: {:.3f} | validation Loss: {:.3f}'\
-        .format(epoch+1 , train_loss_total/ntrain, val_loss_total/nval))
+    scheduler.step(val_loss_epoch)
 
-    # Plotting training and validation loss in a single figure
+    print(f"Epoch {epoch+1:03d}/{nepochs} | Train Loss: {train_loss_epoch:.6f} | Val Loss: {val_loss_epoch:.6f}")
+
+    # ---------------------------------------------------------------------
+    # SAVE LOSS PLOT + CHECKPOINT
+    # ---------------------------------------------------------------------
+
     plt.figure()
-    plt.plot(np.array(train_loss));
-    plt.plot(np.array(val_loss))
-    plt.grid('on');plt.xlabel('Epoch'); plt.ylabel('Loss');
-    plt.legend(['Training','Valdation']);
-    plt.title('Network Training: Loss vs Epoch')
-    plt.savefig('loss.png')
+    plt.plot(np.array(train_loss_hist))
+    plt.plot(np.array(val_loss_hist))
+    plt.grid(True)
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend(["Training", "Validation"])
+    plt.title("MoDL Training: Loss vs Epoch")
+    plt.savefig(out_loss_plot, dpi=200, bbox_inches="tight")
+    plt.close()
 
-    # Saving the model parameters
-    torch.save(model.state_dict(),"model.pt")
+    torch.save(model.state_dict(), out_model_path)
