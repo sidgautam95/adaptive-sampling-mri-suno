@@ -1,360 +1,548 @@
-# Helper functions
+"""
+Helper utilities for SUNO / MoDL / U-Net experiments.
+
+Includes:
+  - sampling mask constructors (VDRS, low-frequency/ACS)
+  - cropping utilities
+  - metric/loss helpers (NRMSE, NMAE, combined loss)
+  - k-space preprocessing (adjoint recon + normalization)
+  - batched U-Net / MoDL reconstruction wrappers
+
+Conventions
+-----------
+- Complex data may be stored as complex dtype (numpy/torch) or as 2-channel real tensors:
+    [2, H, W] where channel 0 = real, channel 1 = imag
+- k-space and sensitivity maps are complex arrays of shape:
+    [ncoils, H, W]
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Optional, Tuple, Union
+
 import numpy as np
 import torch
 from torch import Tensor
-from modl_cg_functions import *
+
+# Optional deps (used only if corresponding metrics/plots are requested)
+try:
+    import matplotlib.pyplot as plt
+except Exception:  # pragma: no cover
+    plt = None
+
+try:
+    from skimage.metrics import structural_similarity as ssim
+except Exception:  # pragma: no cover
+    ssim = None
+
+# Import only what we actually use from modl_cg_functions
+from modl_cg_functions import (
+    fft2,
+    ifft2,
+    complex_matmul,
+    complex_conj,
+    OPAT2,
+    CG_fn,
+)
+
+EPS = 1e-12
 
 
-def make_vdrs_mask(height, width, budget, num_centre_lines, power=4.0, seed=None):
+# -------------------------------------------------------------------------
+# Masks
+# -------------------------------------------------------------------------
+
+def make_vdrs_mask(
+    height: int,
+    width: int,
+    budget: int,
+    num_centre_lines: int,
+    power: float = 4.0,
+    seed: Optional[int] = None,
+) -> np.ndarray:
     """
-    1D variable-density random sampling along the 'width' (ky) axis, broadcast across 'height'.
-    - budget: total number of ky lines to sample (including the ACS block)
-    - num_centre_lines: fully-sampled ACS size (must be even)
-    - power: VD exponent (higher -> more center-heavy)
+    1D variable-density random sampling along width (ky), broadcast across height.
+
+    Parameters
+    ----------
+    height, width : int
+        Mask size.
+    budget : int
+        Total number of ky lines sampled (including the ACS block).
+    num_centre_lines : int
+        Size of the fully sampled center (ACS) block.
+    power : float
+        Exponent for center-heavy sampling (larger -> more center concentration).
+    seed : int or None
+        RNG seed for reproducibility.
+
+    Returns
+    -------
+    mask : np.ndarray (bool), shape [height, width]
     """
-    if num_centre_lines % 2 != 0:
-        raise ValueError("num_centre_lines should be even.")
+    if num_centre_lines <= 0:
+        raise ValueError("num_centre_lines must be positive.")
     if budget < num_centre_lines or budget > width:
         raise ValueError("budget must be in [num_centre_lines, width].")
-    
+
     rng = np.random.default_rng(seed)
     mask = np.zeros((height, width), dtype=bool)
 
-    # ACS block (centered)
+    # Center/ACS block
     c1 = (width - num_centre_lines) // 2
     c2 = c1 + num_centre_lines
     mask[:, c1:c2] = True
 
-    M_rest = budget - num_centre_lines
-    if M_rest == 0:
+    remaining = budget - num_centre_lines
+    if remaining == 0:
         return mask
 
-    # Variable-density PDF over ky
     ky = np.arange(width)
     kc = (width - 1) / 2.0
-    d = np.abs(ky - kc)                 # distance from center
-    dmax = d.max() if d.max() > 0 else 1.0
+    d = np.abs(ky - kc)
+    dmax = max(float(d.max()), 1.0)
 
-    # Probability highest near center, lowest at edges (polynomial VD)
-    # e.g., p(k) ∝ (1 - (d/dmax))^power
+    # p(k) ∝ (1 - d/dmax)^power
     w = (1.0 - d / dmax) ** power
-    w[c1:c2] = 0.0                      # exclude ACS; they’re already selected
-    s = w.sum()
+    w[c1:c2] = 0.0  # exclude ACS (already included)
+
+    s = float(w.sum())
     if s <= 0:
         raise RuntimeError("VD weights degenerate; check width/ACS/power.")
     probs = w / s
 
-    # Sample remaining lines without replacement using the VD probabilities
-    extra = rng.choice(ky, size=M_rest, replace=False, p=probs)
+    extra = rng.choice(ky, size=remaining, replace=False, p=probs)
     mask[:, extra] = True
     return mask
 
-def make_lf_mask(height,width,budget):
-    mask_lf=np.zeros((height,width),dtype='bool');
-    mask_lf[:,(width-budget)//2:(width+budget)//2]=True
-    return mask_lf
+
+def make_lf_mask(height: int, width: int, budget: int) -> np.ndarray:
+    """Centered low-frequency mask with `budget` contiguous ky lines."""
+    if budget <= 0 or budget > width:
+        raise ValueError("budget must be in (0, width].")
+    mask = np.zeros((height, width), dtype=bool)
+    start = (width - budget) // 2
+    end = start + budget
+    mask[:, start:end] = True
+    return mask
 
 
-def crop_img(img,height=320,width=320):
-    # possible shapes of img: 
-    # 1. height x width
-    # 2. batch size x height x width
-    # 3. batch size x no. of channels x height x width
+# -------------------------------------------------------------------------
+# Cropping and format helpers
+# -------------------------------------------------------------------------
 
-    dim=img.ndim
+def crop_img(img: Union[np.ndarray, Tensor], height: int = 320, width: int = 320):
+    """
+    Center-crop images.
 
-    if dim==2:
-        img_cropped = img[(img.shape[0]-height)//2:(img.shape[0]+height)//2, (img.shape[1]-width)//2:(img.shape[1]+width)//2]
-    elif dim==3:
-        img_cropped = img[:,(img.shape[1]-height)//2:(img.shape[1]+height)//2, (img.shape[2]-width)//2:(img.shape[2]+width)//2]
-    elif dim==4:
-        img_cropped =  img[:,:,(img.shape[2]-height)//2:(img.shape[2]+height)//2, (img.shape[3]-width)//2:(img.shape[3]+width)//2]
+    Supported shapes:
+      - [H, W]
+      - [B, H, W]
+      - [B, C, H, W]
+    """
+    if torch.is_tensor(img):
+        h, w = img.shape[-2], img.shape[-1]
     else:
-        print('Wrong dimension:',img.shape)
-    
-    return img_cropped
+        h, w = img.shape[-2], img.shape[-1]
+
+    h1 = (h - height) // 2
+    h2 = h1 + height
+    w1 = (w - width) // 2
+    w2 = w1 + width
+
+    if img.ndim == 2:
+        return img[h1:h2, w1:w2]
+    if img.ndim == 3:
+        return img[:, h1:h2, w1:w2]
+    if img.ndim == 4:
+        return img[:, :, h1:h2, w1:w2]
+
+    raise ValueError(f"Unsupported shape for crop_img: {img.shape}")
 
 
-def compute_nrmse_numpy(img_gt,img_aliased): # Normalized Root Mean Squared Error
-    return np.linalg.norm(img_gt-img_aliased)/np.linalg.norm(img_gt)
+def two_channel_to_complex(img_2channel: Union[np.ndarray, Tensor]):
+    """
+    Convert a 2-channel real/imag representation into a complex image.
 
+    Input shape:
+      - [2, H, W] or [1, 2, H, W] (squeezed internally)
 
-def two_channel_to_complex(img_2channel):
-    # Input: 
-    # Img of shape: 2 x height x width
-    # Returns two channel converted to complex
+    Returns
+    -------
+    complex array/tensor of shape [H, W]
+    """
     if torch.is_tensor(img_2channel):
-        img_2channel = torch.squeeze(img_2channel)
-    else:
-        img_2channel = np.squeeze(img_2channel)
-        
-    return img_2channel[0] +1j * img_2channel[1]
+        x = torch.squeeze(img_2channel)
+        return x[0] + 1j * x[1]
+    x = np.squeeze(img_2channel)
+    return x[0] + 1j * x[1]
 
 
-def compute_nrmse(img_gt,img_aliased):
-    return torch.linalg.norm(img_gt-img_aliased)/torch.linalg.norm(img_gt)
+# -------------------------------------------------------------------------
+# Metrics / losses
+# -------------------------------------------------------------------------
 
-def compute_nmae(img_gt,img_aliased):
-    return torch.mean(torch.abs(img_gt-img_aliased))/torch.mean(torch.abs(img_gt))
-
-
-def compute_loss(img_gt,img_recon,alpha1=1,alpha2=0,alpha3=0,alpha4=0): 
-    
-    # ## Compute reconstruction quality in terms of linear combination of various metrics
-
-    if alpha1!=0:# Normalized Root Mean Squared Error
-        nrmse=compute_nrmse(img_gt,img_recon)
-    else:
-        nrmse=0
-
-    if alpha2!=0:# SSIM: Structural Similarity Index
-        img_gt = img_gt.cpu().detach().numpy()
-        img_recon = img_recon.cpu().detach().numpy()
-        ssim_recon = torch.tensor(ssim(abs(img_gt), abs(img_recon)))
-    else:
-        ssim_recon=0
-
-    if alpha3!=0:#NMAE: normalized mean absolute error
-        nmae = compute_nmae(img_gt,img_recon)
-    else:
-        nmae=0
-
-    if alpha4!=0:#HFEN: high frequency error norm
-        hfen = compute_hfen(img_gt.cpu().detach().numpy(),img_recon.cpu().detach().numpy())
-        hfen = torch.tensor(hfen)
-    else:
-        hfen=0
-
-    return (alpha1*nrmse+alpha2*(1-ssim_recon)+alpha3*nmae+alpha4*hfen)/(alpha1+alpha2+alpha3+alpha4)
+def compute_nrmse_numpy(img_gt: np.ndarray, img_recon: np.ndarray) -> float:
+    return float(np.linalg.norm(img_gt - img_recon) / (np.linalg.norm(img_gt) + EPS))
 
 
+def compute_nrmse(img_gt: Tensor, img_recon: Tensor) -> Tensor:
+    return torch.linalg.norm(img_gt - img_recon) / (torch.linalg.norm(img_gt) + EPS)
 
-def loss_fn(img_input,img_output):
-    # img_input: batch_size x nchannels x height x width
-    nrmse=torch.zeros((img_input.shape[0]))
-    # loop over batch
-    for i in range(img_input.shape[0]):
-        nrmse[i]=torch.linalg.norm(img_input[i]-img_output[i])/\
-        torch.linalg.norm(img_input[i])
+
+def compute_nmae(img_gt: Tensor, img_recon: Tensor) -> Tensor:
+    return torch.mean(torch.abs(img_gt - img_recon)) / (torch.mean(torch.abs(img_gt)) + EPS)
+
+
+def compute_loss(
+    img_gt: Tensor,
+    img_recon: Tensor,
+    alpha1: float = 1.0,
+    alpha2: float = 0.0,
+    alpha3: float = 0.0,
+    alpha4: float = 0.0,
+) -> Tensor:
+    """
+    Weighted combination of metrics:
+      alpha1 * NRMSE
+    + alpha2 * (1 - SSIM)
+    + alpha3 * NMAE
+    + alpha4 * HFEN   (HFEN must be defined by you if you use alpha4 != 0)
+
+    NOTE: SSIM requires scikit-image. HFEN requires a compute_hfen() function (not provided here).
+    """
+    denom = alpha1 + alpha2 + alpha3 + alpha4
+    if denom == 0:
+        raise ValueError("At least one alpha must be non-zero.")
+
+    total = 0.0
+
+    if alpha1 != 0:
+        total = total + alpha1 * compute_nrmse(img_gt, img_recon)
+
+    if alpha2 != 0:
+        if ssim is None:
+            raise ImportError("scikit-image is required for SSIM (alpha2 != 0).")
+        gt_np = img_gt.detach().cpu().numpy()
+        re_np = img_recon.detach().cpu().numpy()
+        ssim_val = ssim(np.abs(gt_np), np.abs(re_np))
+        total = total + alpha2 * (1.0 - torch.tensor(ssim_val, device=img_gt.device, dtype=img_gt.dtype))
+
+    if alpha3 != 0:
+        total = total + alpha3 * compute_nmae(img_gt, img_recon)
+
+    if alpha4 != 0:
+        # If you use HFEN, define compute_hfen somewhere and import it here.
+        raise NotImplementedError("HFEN term requested (alpha4 != 0) but compute_hfen is not implemented/imported.")
+
+    return total / denom
+
+
+def loss_fn(img_input: Tensor, img_output: Tensor) -> Tensor:
+    """
+    Batch NRMSE loss.
+
+    img_input/img_output: [B, C, H, W]
+    """
+    bsz = img_input.shape[0]
+    nrmse = torch.zeros((bsz,), device=img_input.device, dtype=img_input.dtype)
+    for i in range(bsz):
+        nrmse[i] = torch.linalg.norm(img_input[i] - img_output[i]) / (torch.linalg.norm(img_input[i]) + EPS)
     return torch.mean(nrmse)
 
 
-def plot_mr_image(img,title='',Vmax=0.7,colorbar=False,normalize=True,crop=True):
+# -------------------------------------------------------------------------
+# Visualization (optional)
+# -------------------------------------------------------------------------
+
+def plot_mr_image(img, title: str = "", vmax: float = 0.7, colorbar: bool = False,
+                  normalize: bool = True, crop: bool = True):
+    """
+    Quick visualization helper. Requires matplotlib.
+
+    NOTE: kept compatible with your original behavior (flips vertically for knee).
+    """
+    if plt is None:
+        raise ImportError("matplotlib is required for plot_mr_image().")
 
     if torch.is_tensor(img):
-        img=img.cpu().detach().numpy()
+        img = img.detach().cpu().numpy()
 
-    if normalize: # normalize image
-        img = img/abs(img).max()
+    if normalize:
+        img = img / (np.abs(img).max() + EPS)
 
-    img=np.squeeze(img) # remove batch dimension
+    img = np.squeeze(img)
 
-    if img.shape[0]==2: # if it is a two channel image, convert to complex
-        img=two_channel_to_complex(img)
+    if img.ndim >= 3 and img.shape[0] == 2:
+        img = two_channel_to_complex(img)
 
-    if crop: # crop to central 320 x 320
-        img=crop_img(img)
+    if crop:
+        img = crop_img(img)
 
-    img = np.flipud(abs(img)) # flip up-down for knee MR image
-
-    plt.imshow(abs(img),cmap='gray',vmax=Vmax)
-
-    plt.axis('off')
+    img = np.flipud(np.abs(img))
+    plt.imshow(np.abs(img), cmap="gray", vmax=vmax)
+    plt.axis("off")
     plt.title(title)
-
     if colorbar:
         plt.colorbar()
 
-def preprocess_data(ksp,mps,mask,device=torch.device('cpu')):
-    
-    # kspace: shape: no. of coils x height x width
-    # maps: shape: no. of coils x height x width
-    # mask: shape: height x width
+
+# -------------------------------------------------------------------------
+# Preprocessing: k-space + maps + mask -> aliased image (adjoint recon) in 2-channel form
+# -------------------------------------------------------------------------
+
+def preprocess_data(ksp, mps, mask, device: torch.device = torch.device("cpu")):
+    """
+    Convert complex k-space/mps/mask to:
+      - img (2-channel adjoint recon): [2, H, W]
+      - mask (2-channel): [2, H, W]
+      - mps_tensor: [ncoils, 2, H, W]
+
+    Inputs
+    ------
+    ksp : complex array/tensor [ncoils, H, W]
+    mps : complex array/tensor [ncoils, H, W]
+    mask: bool/float array/tensor [H, W]
+    """
+    if not torch.is_tensor(ksp):
+        ksp = torch.tensor(ksp, device=device)
+    else:
+        ksp = ksp.to(device)
+
+    if not torch.is_tensor(mps):
+        mps = torch.tensor(mps, device=device)
+    else:
+        mps = mps.to(device)
+
+    if not torch.is_tensor(mask):
+        mask = torch.tensor(mask, device=device)
+    else:
+        mask = mask.to(device)
 
     ncoils, height, width = ksp.shape
 
-    if torch.is_tensor(ksp)==False:
-        ksp=torch.tensor(ksp).to(device)
-    if torch.is_tensor(mps)==False:
-        mps=torch.tensor(mps).to(device)
-    if torch.is_tensor(mask)==False:
-        mask=torch.tensor(mask).to(device)
+    # Normalize k-space and maps (avoid division by 0)
+    kmax = torch.abs(ksp).max() + EPS
+    smax = torch.abs(mps).max() + EPS
+
+    k_r = torch.real(ksp) / kmax
+    k_i = torch.imag(ksp) / kmax
+    s_r = torch.real(mps) / smax
+    s_i = torch.imag(mps) / smax
+
+    # Two-channel: [2, ncoils, H, W]
+    k_np = torch.stack((k_r, k_i), dim=0)
+    s_np = torch.stack((s_r, s_i), dim=0)
+
+    # Mask as 2-channel: [2, H, W]
+    mask_2ch = mask.unsqueeze(0).repeat(2, 1, 1).float()
+
+    # k-space for fft2/ifft2 expects last dim=2
+    A_k = k_np.permute(1, 0, 2, 3)  # [ncoils, 2, H, W]
+    A_I = ifft2(A_k.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)  # [ncoils, 2, H, W]
+
+    mps_tensor = s_np.permute(1, 0, 2, 3)  # [ncoils, 2, H, W]
+
+    adjoint_recon = torch.sum(complex_matmul(A_I, complex_conj(mps_tensor)), dim=0)  # [2, H, W]
+    scale = torch.max(torch.abs(adjoint_recon)) + EPS
+
+    A_I = A_I / scale
+    A_k = fft2(A_I.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)  # [ncoils, 2, H, W]
+
+    AT = OPAT2(mps_tensor)
+    img = AT(A_k, mask_2ch)
+
+    return img, mask_2ch, mps_tensor
 
 
-    # Normalizing the kspace and sensitivity maps by the maximum value
-    # Separating into real and imaginary part
-    k_r = torch.real(ksp)/abs(ksp).max()
-    k_i = torch.imag(ksp)/abs(ksp).max()
+# -------------------------------------------------------------------------
+# Reconstruction wrappers
+# -------------------------------------------------------------------------
 
-    s_r = torch.real(mps)/abs(mps).max()
-    s_i = torch.imag(mps)/abs(mps).max()
+def unet_recon_batched(ksp, mps, masks, model, batch_size: int = 4, device: torch.device = torch.device("cpu")):
+    """
+    Run U-Net reconstruction for a set of masks on the same (ksp, mps).
 
-    ncoil, nx, ny = s_r.shape
-   
-    # Making two-channel images from the real and imaginary parts of kspace, map,s and mask
-    k_np = torch.stack((k_r, k_i), axis=0) # shape: nchannels x ncoils x nx x ny
-    s_np = torch.stack((s_r,s_i), axis=0) # shape: nchannels x ncoils x nx x ny
+    ksp: [ncoils, H, W] complex
+    mps: [ncoils, H, W] complex
+    masks: [Nm, H, W] or [H, W]
+    """
+    if not torch.is_tensor(masks):
+        masks = torch.tensor(masks, device=device)
+    else:
+        masks = masks.to(device)
 
-    mask = mask.unsqueeze(0).repeat(2,1,1) # shape: nchannels x nx x ny
-
-    A_k = k_np.permute(1, 0, 2, 3) # kspace tensor
-
-    A_I = ifft2(A_k.permute(0, 2, 3, 1)).permute(0, 3, 1, 2) # F^H y, shape: ncoils x nchannels x nx x ny
-
-    mps_tensor = s_np.permute(1, 0, 2, 3) # Maps, shape: ncoils x nchannels x height x width
-
-    adjoint_recon = torch.sum(complex_matmul(A_I, complex_conj(mps_tensor)),dim=0) # S^H F^H y, shape: nchannels x height x width
-
-    A_I = A_I/torch.max(torch.abs(adjoint_recon)[:]) # F^H y/|S^HF^Hy|_max
-
-    A_k = fft2(A_I.permute(0,2,3,1)).permute(0,3,1,2) # F F^H y, kspace after taking FFT of normalized image: ncoils x nchannels x height x width
-
-    AT = OPAT2(mps_tensor) # Initialize function for SENSE Reconstruction S^H F^H y
-
-    img = AT(A_k, mask) # Adjoint Reconstructed image: S^H F^H M y, shape: nchannels x height x width
-
-    return img, mask, mps_tensor
-
-def unet_recon_batched(ksp,mps,masks, model, batch_size=4, device=torch.device('cpu')):
-
-    # Function runs UNET reconstruction on batches of images given kspace, sensitivity maps, and mask.
-    # Inputs
-    # ksp: kspace - Batchsize x nCoils x height x width
-    # mps: Sensitivity Maps - Batchsize x nCoils x height x width
-    # mask: Mask - Batchsize x height x width
-    
-    # Works for both batch-size 1 and multiple batch size
-    # if input is only one slice/no. of dimension = 3, increase dimension by 1.
-
-    # if batchsize=1, ksp_dim = 3 
-    # if batchsize>1, ksp_dim = 4
-    #if only one mask is passed as an argument as a 2D array increase the dimension by one and make it 1xheightxwidth
-
-    if torch.is_tensor(masks)==False:
-        masks=torch.tensor(masks).to(device)
-
-    if masks.ndim==2:
-         masks=masks.unsqueeze(0)
+    if masks.ndim == 2:
+        masks = masks.unsqueeze(0)
 
     nImages, height, width = masks.shape
-    nCoils = ksp.shape[0]
-
     nchannels = 2
 
-    img_aliased = torch.zeros((len(masks),nchannels,height,width))
+    img_aliased = torch.zeros((nImages, nchannels, height, width), device=device)
 
-    for count,mask in enumerate(masks):
-        with torch.no_grad(): # Gradient computation not required
-            img_aliased[count], _,_ = preprocess_data(ksp,mps,mask,device)
+    for i in range(nImages):
+        with torch.no_grad():
+            img_aliased[i], _, _ = preprocess_data(ksp, mps, masks[i], device=device)
 
-    img_height=320
-    img_width=320
-    
-    img_recon = torch.zeros((len(masks),img_height,img_width),dtype=torch.complex64).to(device)
+    img_h, img_w = 320, 320
+    img_recon = torch.zeros((nImages, img_h, img_w), dtype=torch.complex64, device=device)
 
-    # Iterating over batches
-    for batch in np.array_split(np.arange(nImages), nImages//batch_size+1):
-        with torch.no_grad(): # Gradient computation not required
+    # Batch indices
+    idxs = np.arange(nImages)
+    splits = np.array_split(idxs, max(1, nImages // batch_size + 1))
 
-            output = model(crop_img(img_aliased[batch].to(device))).float()
-            img_recon[batch] = (output[:,0] + 1j*output[:,1]).to(device)
+    model.eval()
+    with torch.no_grad():
+        for batch in splits:
+            if len(batch) == 0:
+                continue
+            out = model(crop_img(img_aliased[batch])).float()  # [B, 2, 320, 320]
+            img_recon[batch] = (out[:, 0] + 1j * out[:, 1]).to(device)
 
-    for i in range(len(masks)):
-        img_recon[i] = img_recon[i]/abs(img_recon[i]).max()
+    # Normalize each recon
+    for i in range(nImages):
+        img_recon[i] = img_recon[i] / (torch.abs(img_recon[i]).max() + EPS)
 
     return torch.squeeze(img_recon)
 
 
+def modl_recon_training(
+    img_aliased,
+    mask,
+    mps,
+    model,
+    tol: float = 1e-5,
+    lamda: float = 1e2,
+    num_iter: int = 6,
+    device: torch.device = torch.device("cpu"),
+    print_loss: bool = False,
+):
+    """
+    MoDL reconstruction for training (inputs are already precomputed arrays):
+      img_aliased: [2, H, W]
+      mask      : [2, H, W] or [H, W]
+      mps       : [ncoils, 2, H, W]
+    """
+    if not torch.is_tensor(img_aliased):
+        img_aliased = torch.tensor(img_aliased, device=device)
+    else:
+        img_aliased = img_aliased.to(device)
 
-def modl_recon_training(img_aliased, mask, mps, model, tol=1e-5, lamda=1e2, num_iter=6, device=torch.device('cpu'), print_loss=False):
+    if not torch.is_tensor(mps):
+        mps = torch.tensor(mps, device=device)
+    else:
+        mps = mps.to(device)
 
-    # Function runs MoDL reconstruction
-    # Input
-    # Aliased Image: Shape - nchannels x height x width
-    # mps: Sensitivity Maps - nchannels x nCoils x height x width
-    # mask: Mask - nchannels x height x width
-    
-    # unsqueezing the tensors to add batch dimensions
-    img_aliased = torch.tensor(img_aliased).to(device).float().unsqueeze(0)
-    mps = torch.tensor(mps).to(device).float().unsqueeze(0)
-    mask = torch.tensor(mask).to(device).float().unsqueeze(0)
+    if not torch.is_tensor(mask):
+        mask = torch.tensor(mask, device=device)
+    else:
+        mask = mask.to(device)
 
-    net_input = torch.clone(img_aliased)
+    if mask.ndim == 2:
+        mask = mask.unsqueeze(0).repeat(2, 1, 1)
 
-    for i in range(num_iter): # MoDL unrolling
+    img_aliased = img_aliased.float().unsqueeze(0)  # [1, 2, H, W]
+    mps = mps.float().unsqueeze(0)                  # [1, ncoils, 2, H, W]
+    mask = mask.float().unsqueeze(0)                # [1, 2, H, W]
 
+    net_input = img_aliased.clone()
+
+    for _ in range(num_iter):
+        net_output = model(net_input)
+        cg_output = CG_fn(net_output, tol=tol, lamda=lamda, mps=mps, mask=mask,
+                          aliased_image=img_aliased, device=device)
+        net_input = cg_output.clone()
+
+    return net_input.clone()
+
+
+def modl_recon(
+    ksp,
+    mps,
+    mask,
+    model,
+    tol: float = 1e-5,
+    lamda: float = 1e2,
+    num_iter: int = 6,
+    crop: bool = True,
+    device: torch.device = torch.device("cpu"),
+):
+    """
+    MoDL reconstruction for inference from raw (ksp, mps, mask).
+
+    Returns a complex image (cropped + normalized by default).
+    """
+    if torch.is_tensor(ksp):
+        ksp_t = ksp.to(device)
+    else:
+        ksp_t = torch.tensor(ksp, device=device)
+
+    if torch.is_tensor(mps):
+        mps_t = mps.to(device)
+    else:
+        mps_t = torch.tensor(mps, device=device)
+
+    if torch.is_tensor(mask):
+        mask_t = mask.to(device)
+    else:
+        mask_t = torch.tensor(mask, device=device)
+
+    with torch.no_grad():
+        img_aliased, mask_2ch, mps_tensor = preprocess_data(ksp_t, mps_t, mask_t, device=device)
+
+        img_aliased = img_aliased.float().unsqueeze(0)
+        mps_tensor = mps_tensor.float().unsqueeze(0)
+        mask_2ch = mask_2ch.float().unsqueeze(0)
+
+        net_input = img_aliased.clone()
+
+        for _ in range(num_iter):
             net_output = model(net_input)
-            cg_output = CG_fn(net_output, tol = tol ,lamda = lamda, mps = mps, mask = mask, aliased_image = img_aliased, device = device)
-            net_input = torch.clone(cg_output)
+            cg_output = CG_fn(net_output, tol=tol, lamda=lamda, mps=mps_tensor, mask=mask_2ch,
+                              aliased_image=img_aliased, device=device)
+            net_input = cg_output.clone()
 
-    img_recon_modl = torch.clone(net_input)
+        img_recon = net_input.clone()  # [1, 2, H, W]
+        img_recon_c = two_channel_to_complex(img_recon)  # [H, W] complex
 
-    return img_recon_modl
+        if crop:
+            img_recon_c = crop_img(img_recon_c)
 
+        img_recon_c = img_recon_c / (torch.abs(img_recon_c).max() + EPS)
 
-
-def modl_recon(ksp,mps,mask, model, tol = 0.00001, lamda = 1e2, num_iter = 6, crop=True, device=torch.device('cpu')):
-
-    ncoils, height, width = ksp.shape
-    
-    nchannels = 2
-
-    img_recon = torch.zeros((height,width),dtype=torch.complex64).to(device)
-
-    with torch.no_grad(): # Gradient computation not required
-
-        img_aliased, mask, mps = preprocess_data(ksp,mps,mask) # converting to two channel and computing aliased image
-
-        # img_gt = img_gt.to(device).float().unsqueeze(0)
-        img_aliased = img_aliased.to(device).float().unsqueeze(0)
-        mps = mps.to(device).float().unsqueeze(0)
-        mask = mask.to(device).float().unsqueeze(0)
-
-        net_input = torch.clone(img_aliased)
-
-        for i in range(num_iter): # MoDL unrolling
-
-            net_output = model(net_input)
-            cg_output = CG_fn(net_output, tol = tol ,lamda = lamda, mps = mps, mask = mask, aliased_image = img_aliased, device = device)
-            net_input = torch.clone(cg_output)
-
-        img_recon_modl = torch.clone(net_input)
-
-        img_recon_modl = two_channel_to_complex(img_recon_modl) # converting two channel to complex
-
-        img_recon_modl=crop_img(img_recon_modl) # cropping image to region of interest: central 320 x 320 portion
-
-        img_recon_modl = img_recon_modl/abs(img_recon_modl).max() # normalizing image
-
-    return img_recon_modl
+    return img_recon_c
 
 
-def modl_recon_batched(ksp, mps, masks, model, tol = 0.00001, lamda = 1e2, num_iter = 6, device = torch.device('cpu')):
+def modl_recon_batched(
+    ksp,
+    mps,
+    masks,
+    model,
+    tol: float = 1e-5,
+    lamda: float = 1e2,
+    num_iter: int = 6,
+    device: torch.device = torch.device("cpu"),
+):
+    """
+    Run MoDL reconstruction for a set of masks on the same (ksp, mps).
 
-    # Function runs MoDL reconstruction on the set of masks.
-    # Inputs
-    # ksp: Shape - nCoils x height x width
-    # mps: Sensitivity Maps - nCoils x height x width
-    # mask: Mask - Batchsize x height x width
-    
-    # Works for both batch size 1 and multiple batch input
-    # if input is only one slice/no. of dimension = 3, increase dimension by 1.
+    masks: [Nm, H, W] or [H, W]
+    returns: [Nm, 320, 320] complex (cropped inside modl_recon)
+    """
+    if not torch.is_tensor(masks):
+        masks = torch.tensor(masks)
+    if masks.ndim == 2:
+        masks = masks.unsqueeze(0)
 
-    #if only one mask is passed as an argument as a 2D array increase the dimension by one and make it 1xheightxwidth
-    
-    if masks.ndim==2:
-         masks=(masks).unsqueeze(0)
+    masks = masks.to(device)
+    nmasks = masks.shape[0]
 
-    ncoils, height, width = ksp.shape
-    nmasks=masks.shape[0]
+    out = torch.zeros((nmasks, 320, 320), dtype=torch.complex64, device=device)
 
-    height=320
-    width=320
+    for i in range(nmasks):
+        with torch.no_grad():
+            out[i] = modl_recon(ksp, mps, masks[i], model, tol=tol, lamda=lamda,
+                                num_iter=num_iter, crop=True, device=device)
 
-    img_recon = torch.zeros((nmasks,height,width),dtype=torch.complex64).to(device)
-
-    for count, mask in enumerate(masks):
-        with torch.no_grad(): # Gradient computation not required
-            img_recon[count] = modl_recon(ksp, mps, mask, model, tol, lamda, device=device) # Doing MoDL reconstruction
-
-    return torch.squeeze(img_recon)
+    return torch.squeeze(out)
