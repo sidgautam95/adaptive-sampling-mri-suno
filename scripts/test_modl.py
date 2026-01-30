@@ -24,7 +24,7 @@ from modl_cg_functions import modl_recon
 nChannels = 2
 
 # Pretrained MoDL weights
-modl_path = "modl_didn_fastmri_vdrs_4x.pt"  # <-- CHANGE IF NEEDED
+modl_path = "model.pt"  # add the path of trained model on ICD masks
 
 # Test data (single scan/slice)
 ksp_path = "ksp.npy"       # <-- CHANGE THIS
