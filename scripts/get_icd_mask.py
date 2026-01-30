@@ -47,13 +47,13 @@ alpha1, alpha2, alpha3, alpha4 = 1, 0, 0, 0
 nChannels = 2           # number of channels used by the reconstructor
 
 # Paths to pretrained models (update if you store them elsewhere)
-unet_model_path = "../../saved-models/unet_fastmri_vdrs_4x.pt"
-modl_model_path = "../../saved-models/modl_didn_fastmri_vdrs_4x.pt"
+unet_model_path = "saved-models/unet_fastmri_vdrs_4x.pt"
+modl_model_path = "saved-models/modl_didn_fastmri_vdrs_4x.pt"
 
 # Paths to example data (update to your own files)
-ksp_path = "../../data/ksp.npy"
-mps_path = "../../data/mps.npy"
-img_gt_path = "../../data/img_gt.npy"
+ksp_path = "ksp.npy"
+mps_path = "mps.npy"
+img_gt_path = "img_gt.npy"
 
 # -------------------------------------------------------------------------
 # DEVICE SETUP
