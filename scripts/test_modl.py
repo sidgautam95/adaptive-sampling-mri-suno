@@ -1,26 +1,21 @@
 """
-Inference script: run a pretrained MoDL reconstructor on a SUNO-predicted mask
-for a single multicoil MRI scan/slice.
+Inference script: run a pretrained MoDL reconstructor on a mask for a single multicoil MRI scan/slice.
 
 Expected inputs:
-  ksp  : complex array, shape [ncoils, H, W]
-  mps  : complex array, shape [ncoils, H, W]  (coil sensitivity maps)
-  mask : binary array, shape [H, W]           (SUNO-predicted sampling mask)
+  ksp: complex array, shape [ncoils, H, W]
+  mps: complex array, shape [ncoils, H, W]  (coil sensitivity maps)
+  mask: binary array, shape [H, W]           (SUNO-predicted sampling mask)
 
 Output:
-  test_img_recon.npy : reconstructed image (complex or 2-channel, depending on implementation)
+  test_img_recon.npy: reconstructed image (complex or 2-channel, depending on implementation)
 """
 
 import os
 import sys
 import numpy as np
 import torch
-
-sys.path.append("../utils")
-sys.path.append("../models")
-
 from didn import DIDN
-from modl_cg_functions import modl_recon  # assumes modl_recon is defined here
+from modl_cg_functions import modl_recon
 
 # -------------------------------------------------------------------------
 # USER SETTINGS (PLEASE UPDATE THESE PATHS AS NEEDED)
@@ -29,14 +24,14 @@ from modl_cg_functions import modl_recon  # assumes modl_recon is defined here
 nChannels = 2
 
 # Pretrained MoDL weights
-modl_path = "../../saved-models/modl_didn_fastmri_vdrs_4x.pt"  # <-- CHANGE IF NEEDED
+modl_path = "modl_didn_fastmri_vdrs_4x.pt"  # <-- CHANGE IF NEEDED
 
 # Test data (single scan/slice)
-ksp_path = "../../data/ksp.npy"       # <-- CHANGE THIS
-mps_path = "../../data/mps.npy"       # <-- CHANGE THIS
+ksp_path = "ksp.npy"       # <-- CHANGE THIS
+mps_path = "mps.npy"       # <-- CHANGE THIS
 
-# SUNO predicted mask (output of nearest_neighbor_search.py)
-mask_path = "suno_mask.npy"           # <-- CHANGE IF NEEDED
+# SUNO mask (output of nearest_neighbor_search.py)
+mask_path = "mask.npy"           # <-- CHANGE THIS
 
 # Output filename
 out_recon_path = "test_img_recon.npy"
