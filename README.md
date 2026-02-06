@@ -1,6 +1,6 @@
 # SUNO: Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
 Official Python implementation accompanying the IEEE TCI paper:
 
