@@ -1,15 +1,15 @@
-# Scan-adaptive Sampling for MRI (SUNO)
-## Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)
+# SUNO: Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization
 
-Python implementation for the paper:
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)**  
+Official Python implementation accompanying the IEEE TCI paper:
+
 **Siddhant Gautam**, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar  
-*IEEE Transactions on Computational Imaging*, pp. 1–13, Jan. 2026  
+*IEEE Transactions on Computational Imaging*, Jan. 2026  
 
-**DOI:** 10.1109/TCI.2026.3653330
+📄 **IEEE Xplore:** https://ieeexplore.ieee.org/document/11346972  
+🔗 **DOI:** 10.1109/TCI.2026.3653330
 
-**IEEE Xplore:** https://ieeexplore.ieee.org/document/11346972
 
 ### Alternating training framework:
 In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
