@@ -1,7 +1,7 @@
 # SUNO: Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization
 
 [![IEEE Xplore](https://img.shields.io/badge/IEEE%20Xplore-Paper-blue.svg)](https://ieeexplore.ieee.org/document/11346972)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 
 
