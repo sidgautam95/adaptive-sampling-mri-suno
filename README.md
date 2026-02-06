@@ -4,121 +4,209 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 
-
-Official Python implementation accompanying the IEEE TCI paper:
+> **Official Python Implementation** for the paper  
+> **“Scan-Adaptive MRI Undersampling Using Neighbor-based Optimization (SUNO)”**  
+> *IEEE Transactions on Computational Imaging, 2026*
 
 **Siddhant Gautam**, Angqi Li, Nicole Seiberlich, Jeffrey A. Fessler, Saiprasad Ravishankar  
-*IEEE Transactions on Computational Imaging*, Jan. 2026  
 
 📄 **IEEE Xplore:** https://ieeexplore.ieee.org/document/11346972  
-🔗 **DOI:** 10.1109/TCI.2026.3653330
+🔗 **DOI:** 10.1109/TCI.2026.3653330  
 
+---
 
-### Alternating training framework:
-In this paper, we propose a novel approach for jointly learning a set of scan-adaptive Cartesian undersampling patterns along with a reconstructor trained on such undersampling patterns. 
-Using a training set consisting of fully sampled $k$-space and corresponding ground truth images, we learn a collection of scan-adaptive undersampling masks and a reconstructor from the training data. The joint optimization problem can be formulated as:
+## 📖 Overview
 
+This repository implements **SUNO**, a framework for **scan-adaptive MRI undersampling**.
 
-<p align="center">
-$$
+Unlike conventional fixed undersampling strategies, SUNO learns a collection of optimized undersampling masks and selects the most suitable mask for each test scan using a nearest-neighbor search in low-frequency k-space.
+
+SUNO enables:
+
+- **Adaptive undersampling tailored to individual scans**
+- Joint optimization of sampling patterns and reconstruction networks
+- No retraining required at inference time
+- Compatibility with standard deep MRI reconstruction models
+
+---
+
+## ✨ Key Features
+
+- **ICD-based Sampling Optimization** for learning scan-specific masks  
+- **Nearest Neighbor Search** for test-time mask prediction  
+- Support for multiple reconstruction networks:
+  - MoDL  
+  - U-Net  
+- Complete pipeline for training, mask learning, and inference  
+
+---
+
+## 🧠 Alternating Training Framework
+
+SUNO jointly learns a set of scan-adaptive undersampling masks and a reconstruction network using the following optimization formulation:
+
+\[
 \underset{\theta, M_i}{\min}
 \sum_{i=1}^N
 \big\|
   f_{\theta}\big(\mathbf{A}_i^H \,\mathbf{M}_i\, \mathbf{y}^{\mathrm{full}}_i\big)
   - \mathbf{x}^{\mathrm{gt}}_i
 \big\|_2^2
-$$
-</p>
+\]
 
 where:
 
-- $\mathbf{M}_i$ is the $i$-th training mask that inserts zeros at non-sampled locations.
-- $\mathbf{y}^{\mathrm{full}}_i$ and $\mathbf{x}^{\mathrm{gt}}_i$ are the fully-sampled multi-coil $k$-space data and the corresponding ground-truth image for the $i$-th scan, respectively.
-- $N$ is the total number of training images.
-- $\mathcal{C}$ is the set of all 1D Cartesian undersampling patterns with a specified sampling budget.
-- $\mathbf{A}_i^H$ is the adjoint of the fully-sampled multi-coil MRI measurement operator for the $i$-th training scan.
-- $f_{\theta}$ is the reconstruction network parameterized by $\theta$, trained on the set of sampling patterns $\{\mathbf{M}_i\}_{i=1}^N$.
+- \( \mathbf{M}_i \) – learned undersampling mask for scan \(i\)  
+- \( \mathbf{y}^{\mathrm{full}}_i \) – fully sampled multi-coil k-space  
+- \( \mathbf{x}^{\mathrm{gt}}_i \) – ground-truth image  
+- \( \mathbf{A}_i^H \) – adjoint MRI measurement operator  
+- \( f_{\theta} \) – reconstruction network  
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/icd_alternating.png" alt="alt text" />
-</p>
+The framework alternates between:
 
----
-### Getting Scan-adaptive masks:
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/mri_train_pipeline.png" alt="alt text" />
-</p>
+1. Optimizing masks using **iterative coordinate descent (ICD)**  
+2. Training the reconstruction network with the updated masks  
 
 ---
-### Nearest Neighbor Search:
-Given our collection of scan-adaptive sampling patterns obtained from the training process, the task at test time is to estimate the locations of high-frequency samples in $k$-space based on initially acquired low-frequency information. We use the nearest neighbor search to predict the sampling pattern from the collection of training scans. The nearest neighbor is found by comparing the adjoint reconstruction of the low-frequency test $k$-space and the corresponding low-frequency part of the training $k$-space as follows:
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/neighbor_finding_equation.png" alt="alt text" />
-</p>
+## 🧩 Test-Time Scan Adaptation
 
-The test-time pipeline uses the predicted sampling mask from nearest neighbor search, as illustrated below:
+### Nearest-Neighbor Mask Prediction
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/mri_testing_pipeline_nn.png" alt="alt text" />
-</p>
+At inference time, SUNO predicts a scan-specific sampling mask by comparing low-frequency k-space information from the test scan with that of training scans.
 
-**Datasets**: We used the publicly available fastMRI multi-coil knee and brain datasets (https://arxiv.org/abs/1811.08839) for our experiments, which can be downloaded at https://fastmri.med.nyu.edu/. 
+The selected mask is then used with a pretrained reconstruction network—**no additional training is required.**
 
-**Saved Models**: The trained model weights for running the code can be found at https://drive.google.com/drive/folders/1Ppog0VikG06vLUk6F63gn79pdAeAYL-F.
+This enables fully adaptive MRI acquisition at test time with minimal overhead.
 
-The code is made up of three components: 
-* Sampling Optimization Algorithm
-* Nearest Neighbor Search
-* Training and Testing Reconstruction Networks (MoDL and U-Net)
+---
 
-## ICD-based Sampling Optimization algorithm
+## 📂 Repository Components
 
-Run `get_icd_mask.py` to get the ICD mask for a given choice of reconstructor, metric, undersampling factor, and initial mask. The default parameters are:
-1. Reconstructor: UNet
-2. Metric: NRMSE
-3. Undersampling factor: 4x
-4. Initial Mask: Variable Density Random Sampling (VDRS)
+The codebase consists of three main modules:
 
-### Output:
+1. **Sampling Optimization Algorithm**  
+2. **Nearest Neighbor Search for Mask Selection**  
+3. **Training and Testing Pipelines**
+   - MoDL-based reconstruction  
+   - U-Net-based reconstruction  
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/icd_recon_4x.png" alt="alt text" />
-</p>
+---
 
-## Nearest Neighbor Search
-At inference time, a nearest neighbor search based on proximity to low-frequency k-space reconstructions is used to choose the best scan-specific mask from the training set.
-Run `nearest_neighbor_search.py` to get the nearest neighbor predicted mask (also called the SUNO mask).
+## 🚀 Getting Started
 
-## Training and Testing MoDL
+### Requirements
 
-Run `data_preprocessing_modl.py` to preprocess the kspace, maps and ground truth data for MoDL and U-Net training the MoDL network.
+- Python 3.8+
+- PyTorch
+- NumPy
+- SciPy
+- SigPy
 
-Run `train_modl.py` to train the MoDL network (https://ieeexplore.ieee.org/document/8434321) on a set of training images, undersampled by scan adaptive masks.
+Install dependencies:
 
-Run `test_modl.py` to test the trained MoDL on the SUNO-predicted mask.
+```bash
+pip install -r requirements.txt
+```
 
-`modl_cg_functions.py` contains the helper functions for running the conjugate gradient algorithm inside the MoDL framework.
+---
 
-The MoDL data preprocessing component is inspired by https://github.com/JeffFessler/BLIPSrecon.
+## 🧪 Datasets and Pretrained Models
 
-## Results
-### SUNO mask with other baselines at 4x acceleration factor:
+### Datasets
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/baseline_masks_4x.png" alt="alt text" />
-</p>
+Experiments were conducted using the publicly available **fastMRI multi-coil knee and brain datasets**.
 
-### Reconstructed Images at 4x:
+- fastMRI paper: https://arxiv.org/abs/1811.08839  
+- Dataset download: https://fastmri.med.nyu.edu/
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/sidgautam95/adaptive-sampling-mri-suno/main/figures/img_recon_all_masks.png" alt="alt text" />
-</p>
+### Pretrained Models
 
-The SUNO masks outperform the baseline masks at 4x. The bottom row shows the region of interest.
+Pretrained models for reproducing the results in the paper are available at:
 
-## Citation
+https://drive.google.com/drive/folders/1Ppog0VikG06vLUk6F63gn79pdAeAYL-F
+
+---
+
+## 🏃 Usage
+
+### 1. ICD-based Sampling Optimization
+
+To compute optimized sampling masks:
+
+```bash
+python get_icd_mask.py
+```
+
+Default configuration:
+
+- Reconstructor: **U-Net**
+- Metric: **NRMSE**
+- Undersampling factor: **4x**
+- Initialization: **Variable Density Random Sampling (VDRS)**
+
+---
+
+### 2. Nearest Neighbor Search
+
+To predict SUNO masks at test time:
+
+```bash
+python nearest_neighbor_search.py
+```
+
+This script selects the most appropriate mask from the learned collection using low-frequency k-space similarity.
+
+---
+
+### 3. Training and Testing MoDL
+
+#### Data Preprocessing
+
+```bash
+python data_preprocessing_modl.py
+```
+
+#### Train MoDL
+
+```bash
+python train_modl.py
+```
+
+#### Test with SUNO Masks
+
+```bash
+python test_modl.py
+```
+
+Helper functions for the conjugate gradient solver used inside MoDL are provided in:
+
+```
+modl_cg_functions.py
+```
+
+The MoDL data preprocessing module is inspired by:
+
+https://github.com/JeffFessler/BLIPSrecon
+
+---
+
+## 📊 Results
+
+SUNO masks consistently outperform baseline fixed sampling strategies such as:
+
+- Equispaced undersampling  
+- Variable Density Random Sampling (VDRS)  
+- VISTA  
+
+across multiple datasets and reconstruction models.
+
+Please refer to the paper for detailed quantitative and qualitative comparisons.
+
+---
+
+## 📝 Citation
+
 If you use this code or the SUNO framework in your research, please cite:
 
 ```bibtex
@@ -128,11 +216,25 @@ If you use this code or the SUNO framework in your research, please cite:
   journal={IEEE Transactions on Computational Imaging},
   year={2026},
   pages={1--13},
-  doi={10.1109/TCI.2026.3653330},
-  publisher={IEEE}
+  doi={10.1109/TCI.2026.3653330}
 }
 ```
 
-**Contact**  
-The code is provided to support reproducible research. If you have any questions about the code or have some trouble running any module of the framework, you can contact Siddhant Gautam (gautamsi@msu.edu) or Saiprasad Ravishankar (ravisha3@msu.edu).
+---
 
+## 📬 Contact
+
+For questions regarding the code or paper, please contact:
+
+- **Siddhant Gautam** – gautamsi@msu.edu  
+- **Saiprasad Ravishankar** – ravisha3@msu.edu  
+
+---
+
+## License
+
+This project is released under the **MIT License**.
+
+---
+
+This repository is provided to support **reproducible research** in adaptive MRI sampling.
